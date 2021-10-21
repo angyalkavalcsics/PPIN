@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cbook
 ###############################################################################
 # Read in file
-unpickled_df = pd.read_pickle("]species_data.output.pickle")
+unpickled_df = pd.read_pickle("C:/Users/angya/OneDrive/Documents/species_data.output.pickle")
 # Get all adjacency matrices
 adj = unpickled_df.iloc[:, 8]
 # Test network species ID: 882 
@@ -25,10 +25,10 @@ G = nx.convert_matrix.from_numpy_matrix(first)
 # Playing around with different drawings
 # my vote is for kawai
 kawai = nx.kamada_kawai_layout(G)
-nx.draw(G, kawai, node_size=40)
+nx.draw(G, kawai, node_size=25)
 
-spring = nx.spring_layout(G, k=0.9, iterations=100)
-nx.draw(G, spring, node_size=50) # dense!
+spring = nx.spring_layout(G, k=0.95, iterations=200)
+nx.draw(G, spring, node_size=30) # dense!
 
 from networkx.drawing.nx_agraph import graphviz_layout
 from pylab import rcParams
