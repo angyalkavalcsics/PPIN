@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cbook
 ###############################################################################
 # Read in file
-unpickled_df = pd.read_pickle("C:/Users/angya/OneDrive/Documents/species_data.output.pickle")
+unpickled_df = pd.read_pickle("]species_data.output.pickle")
 # Get all adjacency matrices
 adj = unpickled_df.iloc[:, 8]
 # Test network species ID: 882 
