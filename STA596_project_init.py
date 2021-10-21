@@ -75,11 +75,19 @@ times, once at each node.
 Returns: Number of triangles keyed by node label.
 '''
 triangles = nx.triangles(G)
+avg_triangles = np.mean(list(triangles.values()))
+
+# Modularity
 
 
 
 
+# Run this for subset of species and store values
 
+
+
+
+# Fit a linear model
 
 
 
