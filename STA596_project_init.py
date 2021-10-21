@@ -24,6 +24,7 @@ G = nx.convert_matrix.from_numpy_matrix(first)
 
 # Playing around with different drawings
 # my vote is for kawai
+#ax.set_title('species name')
 kawai = nx.kamada_kawai_layout(G)
 nx.draw(G, kawai, node_size=25)
 
