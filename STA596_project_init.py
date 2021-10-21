@@ -75,7 +75,6 @@ times, once at each node.
 Returns: Number of triangles keyed by node label.
 '''
 triangles = nx.triangles(G)
-avg_triangles = np.mean(np.asarray(triangles.values()))
 
 
 
