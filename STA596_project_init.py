@@ -17,6 +17,11 @@ import statsmodels.api as sm
 from sklearn import linear_model
 from sklearn import ensemble
 ###############################################################################
+# TODO: Definitely could reorganize a bit (my b).
+# Starting with running through the adj matrices (once we settle on one) and 
+# returning the adj for the giant comp rather than running this over and over 
+# under each method. I'll work on this shortly (tmrw?) but if it bothers you then feel free!
+###############################################################################
 # Read in file
 unpickled_df = pd.read_pickle("C:/Users/angya/OneDrive/Documents/species_data.output.pickle")
 ###############################################################################
