@@ -35,7 +35,7 @@ adj2 = reduced_df2.iloc[:, 8]
 ###############################################################################
 # Playing around with different drawings
 
-first = adj.iloc[31].todense()
+first = adj2.iloc[31].todense()
 G = nx.convert_matrix.from_numpy_matrix(first) 
 # need to fix the networks so we only take the 
 # giant connected component from each one 
@@ -189,8 +189,6 @@ for i in range(len(adj2)):
     
     conn = nx.node_connectivity(giantC)
     res2.loc[i, 'Node Connectivity'] = conn
-    
-
 
 #######################
     
@@ -236,6 +234,38 @@ np.mean((y2 - yhat2)**2) # 0.046
 feature_importances = np.mean([
     tree.feature_importances_ for tree in m.estimators_
 ], axis=0)
+
+
+#############
+
+# s_k as predictor
+
+'''
+The S_k is a node with k edges
+'''
+def getstars(adj):
+    temp = adj.todense()
+    G = nx.convert_matrix.from_numpy_matrix(temp) 
+    Gcc = max(nx.connected_components(G), key=len)
+    giantC = G.subgraph(Gcc) 
+    
+    A = nx.adjacency_matrix(giantC).todense()
+    deg = np.asarray(np.sum(A,axis=0)).flatten()
+    values, counts = np.unique(deg, return_counts=True)
+    stars_sm = pd.DataFrame(counts)
+    stars_sm = stars_sm.set_index(values)
+    return(stars_sm)
+
+df_list = []
+for a in range(len(adj2)):
+    t = getstars(adj2.iloc[a])
+    df_list.append(t)
+    
+stars = pd.concat(df_list, axis = 1)
+stars.columns = reduced_df2['Species_ID']
+stars = stars.fillna(0)
+
+# Next: fit a LASSO separately and/or combine with clique df and fit 
 
 
 
