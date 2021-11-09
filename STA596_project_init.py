@@ -117,12 +117,13 @@ nx.node_connectivity(G, flow_func=shortest_augmenting_path)
 If you are wondering why I didn't include eigencentrality as a predictor it
 is because the function would not converge occassionally. I tried setting
 max iterations to like 1000 then just decided to leave it alone.
+
+Also I took out node connectivity since it is 1 for each network.
 '''
 
 res = pd.DataFrame({'Average Centrality' : [],
                     'Average Closed Triangles' : [],
-                    'Modularity' : [],
-                    'Node Connectivity' : []
+                    'Modularity' : []
                     })
 
 for i in tqdm(range(len(adj))):
@@ -143,19 +144,16 @@ for i in tqdm(range(len(adj))):
     modularity = nx_comm.modularity(giantC, 
                                     nx_comm.label_propagation_communities(giantC))
     res.loc[i, 'Modularity'] = modularity
-    
-    conn = nx.node_connectivity(giantC)
-    res.loc[i, 'Node Connectivity'] = conn
     sleep(3)
     
 ###############################################################################
     
 # Fit a linear model
 
-# SLR with modularity as predictor R-sqrd = 0.954
+# SLR with modularity as predictor 
 X = sm.add_constant(res)
 y = list(reduced_df['Evolution'])
-model = sm.OLS(y, X.iloc[:, 3])
+model = sm.OLS(y, X.iloc[:, 2])
 est = model.fit()
 print(est.summary())
 
@@ -199,9 +197,10 @@ def getstars(adj):
     return(stars_sm)
 
 df_list = []
-for a in range(len(adj)):
+for a in tqdm(range(len(adj))):
     t = getstars(adj.iloc[a])
     df_list.append(t)
+    sleep(0.05)
     
 stars = pd.concat(df_list, axis = 1)
 stars.columns = reduced_df['Species_ID']
