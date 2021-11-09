@@ -144,7 +144,7 @@ for i in tqdm(range(len(adj))):
     modularity = nx_comm.modularity(giantC, 
                                     nx_comm.label_propagation_communities(giantC))
     res.loc[i, 'Modularity'] = modularity
-    sleep(3)
+    sleep(0.05)
     
 ###############################################################################
     
