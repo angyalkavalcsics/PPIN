@@ -14,10 +14,11 @@ import matplotlib.pyplot as pyplot
 import networkx.algorithms.community as nx_comm
 from networkx.algorithms.flow import shortest_augmenting_path
 import statsmodels.api as sm
+import sklearn as sk
 from sklearn import linear_model
 from sklearn import ensemble
+from sklearn import decomposition
 from tqdm import tqdm
-from time import sleep
 ###############################################################################
 # TODO: 
 # Find cliques for each network.
@@ -32,7 +33,7 @@ unpickled_df = pd.read_pickle("C:/Users/angya/OneDrive/Documents/species_data.ou
 
 bact_prot = unpickled_df.loc[unpickled_df["Taxonomy Level 2"] == "Bacteria_Proteobacteria"]
 reduced_df = bact_prot.iloc[:75, :]
-adj = reduced_df.iloc[:, 8]
+adj = reduced_df['Matrix']
 ###############################################################################
 # Some plots
 first = adj.iloc[31].todense()
@@ -114,12 +115,12 @@ nx.node_connectivity(G, flow_func=shortest_augmenting_path)
 
 # Cliques
 
-class CliqueStats:
-    def __init__(self, df):
-        self.clique_count = df['count'].sum()
-        self.size_max = df['size'].max()
-        self.size_mode = df.iloc[df['count'].idxmax()]['size']
-        self.size_mean = (df['size']  * df['count']).sum() / self.clique_count
+class HistStats:
+    def __init__(self, df, val):
+        self.count = df['count'].sum()
+        self.max = df[val].max()
+        self.mode = df.iloc[df['count'].idxmax()][val]
+        self.mean = (df[val] * df['count']).sum() / self.count
         
 def get_clique_count_df(G):
     clique_counts = {}
@@ -129,8 +130,16 @@ def get_clique_count_df(G):
     
     # convert to pandas series
     clique_count_df = pd.DataFrame.from_dict(clique_counts,orient='index').reset_index()
-    clique_count_df.columns = ['size', 'count']
+    clique_count_df.columns = ['clique_size', 'count']
     return clique_count_df
+
+# Degree
+
+def get_degree_hist(G):
+    degree = nx.degree_histogram(G)
+    degree_df = pd.DataFrame(degree).reset_index()
+    degree_df.columns = ['degree', 'count']
+    return degree_df
 
 # Run this for subset of species and store values
 
@@ -142,20 +151,7 @@ max iterations to like 1000 then just decided to leave it alone.
 Also I took out node connectivity since it is 1 for each network.
 '''
 
-res = pd.DataFrame({
-    'Average Centrality': [],
-    'Average Closed Triangles': [],
-    'Modularity': [],
-    'Clique Count': [],
-    'Clique-Size Max': [], # aka "clique number"
-    'Clique-Size Mode': [],
-    'Clique-Size Mean': [],
-    'LCSG Clique Count': [],
-    'LCSG Clique-Size Max': [], # aka "clique number"
-    'LCSG Clique-Size Mode': [],
-    'LCSG Clique-Size Mean': [],
-    })
-
+predictors = []
 for i in tqdm(range(len(adj))):
     temp = adj.iloc[i].todense()
     G = nx.convert_matrix.from_numpy_matrix(temp) 
@@ -165,46 +161,100 @@ for i in tqdm(range(len(adj))):
     centrality = nx.degree_centrality(giantC)
     centrality_df = pd.DataFrame.from_dict(centrality, orient='index')
     avg_centrality = np.mean(centrality_df.iloc[:, 0])
-    res.loc[i, 'Average Centrality'] = avg_centrality
     
     triangles = nx.triangles(giantC)
     avg_triangles = np.mean(list(triangles.values()))
-    res.loc[i, 'Average Closed Triangles'] = avg_triangles
     
     modularity = nx_comm.modularity(giantC, 
                                     nx_comm.label_propagation_communities(giantC))
-    res.loc[i, 'Modularity'] = modularity
     
-    clique_stats = CliqueStats(get_clique_count_df(G))
-    res.loc[i, 'Clique Count'] = clique_stats.clique_count
-    res.loc[i, 'Clique-Size Max'] = clique_stats.size_max
-    res.loc[i, 'Clique-Size Mode'] = clique_stats.size_mode
-    res.loc[i, 'Clique-Size Mean'] = clique_stats.size_mean
+    clique_size = HistStats(get_clique_count_df(G), 'clique_size')
+    lcsg_clique_size = HistStats(get_clique_count_df(giantC), 'clique_size')
     
-    clique_stats = CliqueStats(get_clique_count_df(giantC))
-    res.loc[i, 'LCSG Clique Count'] = clique_stats.clique_count
-    res.loc[i, 'LCSG Clique-Size Max'] = clique_stats.size_max
-    res.loc[i, 'LCSG Clique-Size Mode'] = clique_stats.size_mode
-    res.loc[i, 'LCSG Clique-Size Mean'] = clique_stats.size_mean
+    degree_stats = HistStats(get_degree_hist(G), 'degree')
+    lcsg_degree_stats = HistStats(get_degree_hist(giantC), 'degree')
+    
+    predictors.append([
+        avg_centrality,
+        avg_triangles,
+        modularity,
+        clique_size.count,
+        clique_size.max,
+        clique_size.mode,
+        clique_size.mean,
+        lcsg_clique_size.count,
+        lcsg_clique_size.max,
+        lcsg_clique_size.mode,
+        lcsg_clique_size.mean,
+        degree_stats.count,
+        degree_stats.max,
+        degree_stats.mode,
+        degree_stats.mean,
+        lcsg_degree_stats.count,
+        lcsg_degree_stats.max,
+        lcsg_degree_stats.mode,
+        lcsg_degree_stats.mean,
+        ])
 
 ###############################################################################
 
-X = sm.add_constant(res)
-y = list(reduced_df['Evolution'])
-
-# Print a pair plot of predictors with SLR R^2 > .8
-slr_r2_gt_8 = {
+X = sm.add_constant(pd.DataFrame(predictors, columns=[
+    'Average Centrality',
+    'Average Closed Triangles',
     'Modularity',
+    'Clique Count',
     'Clique-Size Max',
+    'Clique-Size Mode',
     'Clique-Size Mean',
+    'LCSG Clique Count',
+    'LCSG Clique-Size Max',
     'LCSG Clique-Size Mode',
     'LCSG Clique-Size Mean',
+    'Node Count',
+    'Degree Max',
+    'Degree Mode',
+    'Degree Mean',
+    'LCSG Node Count',
+    'LCSG Degree Max',
+    'LCSG Degree Mode',
+    'LCSG Degree Mean',
+    ]))
+y = reduced_df['Evolution']
+
+'''
+Trying some meta-stats, it seems like 'GiantProportion' (the proportion of
+total nodes that are included in the largest connected subgraph) is almost
+as powerful as modularity (as meaured by SLR R^2). We might expect this is
+another way to measure connectivity/resiliency of the proteome.
+'''
+X['GiantProportion'] = X['LCSG Node Count']/X['Node Count']
+
+compare = {
+    'Modularity',
+    'GiantProportion',
+    'ModPerNode',
+    'Node Count',
+    # 'Degree Max',
+    # 'Degree Mode',
+    # 'Degree Mean',
+    'LCSG Node Count',
+    # 'LCSG Degree Max',
+    # 'LCSG Degree Mode',
+    # 'LCSG Degree Mean',
+    # 'Clique Count',
+    # 'Clique-Size Max',
+    # 'Clique-Size Mode',
+    # 'Clique-Size Mean',
+    # 'LCSG Clique Count',
+    # 'LCSG Clique-Size Max',
+    # 'LCSG Clique-Size Mode',
+    # 'LCSG Clique-Size Mean',
     }
-sns.pairplot(X[slr_r2_gt_8], kind="reg", diag_kind="kde")
+sns.pairplot(X[compare], kind="reg", diag_kind="kde")
 
 # Fit a linear model
 # SLR with modularity as predictor
-for col in slr_r2_gt_8:
+for col in X.columns[1:]:
     # if col != 'Modularity': continue
     print('\n')
     model = sm.OLS(y, X[col])
@@ -221,9 +271,9 @@ lasso_est = lassocv.fit(X,y)
 # Fit a tree
 
 m = ensemble.BaggingRegressor()
-m.fit(res,y)
+m.fit(X,y)
 
-yhat = m.predict(res)
+yhat = m.predict(X)
 np.mean((y - yhat)**2) # 0.007
 
 feature_importances = np.mean([
@@ -233,7 +283,7 @@ feature_importances = np.mean([
 for i in np.argsort(feature_importances)[::-1]:
     if feature_importances[i] == 0:
         break
-    print(f'\t{res.columns[i]}: {feature_importances[i]:.3f}')
+    print(f'\t{X.columns[i]}: {feature_importances[i]:.3f}')
 
 ###############################################################################
 
