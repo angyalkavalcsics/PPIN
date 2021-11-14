@@ -121,37 +121,43 @@ class Worker(mp.Process):
                         nx_comm.label_propagation_communities(lcsg))
                     # row['connectivity'] = nx.node_connectivity(lcsg, flow_func=shortest_augmenting_path)
                 
-                    # clique stats
+                
+                    # ---- clique stats
                     maximal_clique_counts = Counter()
                     for clique in nx.find_cliques(lcsg):
                         maximal_clique_counts[len(clique)] += 1
+                    
                     maximal_df = pd.DataFrame.from_dict(maximal_clique_counts,orient='index').reset_index()
                     maximal_df.columns = ['clique_size', 'count']
                     maximal_stats = HistStats(maximal_df,'clique_size')
-                    row['c_count'] = maximal_stats.count
-                    row['c_max'] = maximal_stats.max
-                    row['c_mode'] = maximal_stats.mode
-                    row['c_mean'] = maximal_stats.mean
+                    row['mc_count'] = maximal_stats.count
+                    row['mc_max'] = maximal_stats.max
+                    row['mc_mode'] = maximal_stats.mode
+                    row['mc_mean'] = maximal_stats.mean
+                    row.update({f'mc_{k}': v for k, v in maximal_clique_counts.items()})
                     
-                    # # exhaustive clique counts
-                    clique_counts = Counter()
-                    for clique in nx.enumerate_all_cliques(lcsg):
-                        clique_counts[len(clique)] += 1
-                    row.update({f'c_{k}': v for k, v in clique_counts.items()})
+                    
+                    # ---- exhaustive clique counts
+                    # clique_counts = Counter()
+                    # for clique in nx.enumerate_all_cliques(lcsg):
+                    #     clique_counts[len(clique)] += 1
+                    # row.update({f'c_{k}': v for k, v in clique_counts.items()})
                     # row.update({f'c_{k}': v for k, v in get_clique_count_df(lcsg).items()})
                     
-                    # degree stats
-                    degree = nx.degree_histogram(lcsg)
-                    degree_df = pd.DataFrame(degree).reset_index()
+                    
+                    # ---- degree stats
+                    degree_hist = nx.degree_histogram(lcsg)
+                    degree_df = pd.DataFrame(degree_hist).reset_index()
                     degree_df.columns = ['degree', 'count']
                     degree_stats = HistStats(degree_df,'degree')
                     row['d_max'] = degree_stats.max
                     row['d_mode'] = degree_stats.mode
                     row['d_mean'] = degree_stats.mean
                     
-                    # # exhaustive degree counts
-                    row.update({f'd_{k}': v for k, v in enumerate(degree)})
+                    # exhaustive degree counts
+                    row.update({f'd_{k}': v for k, v in enumerate(degree_hist)})
                     # row.update({f'Node Degree {k}': v for k, v in enumerate(get_degree_hist(lcsg))})
+                        
                     
                     # pet stat
                     row['giant_prop'] = lcsg.number_of_nodes()/G.number_of_nodes()
@@ -159,7 +165,7 @@ class Worker(mp.Process):
                     # push DataFrame to queue
                     while True:
                         try:
-                            self.row_queue.put_nowait(pd.DataFrame([row]))
+                            self.row_queue.put_nowait(row)
                             break
                         except queue.Full:
                             sleep(.5)
@@ -190,7 +196,7 @@ class Consumer(mp.Process):
                             self.result_queue.put(None)
                             break
                     else:
-                        self.df = pd.concat([self.df, row], ignore_index=True)
+                        self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
                         self.result_queue.put(self.df)
                 except queue.Empty:
                     sleep(.5)

@@ -53,7 +53,7 @@ def main():
     ppins = sub_df['Matrix']
     
     cores = mp.cpu_count()
-    num_workers = 1#max(1, cores//2)
+    num_workers = 3#max(1, cores//2)
     
     progress = tqdm(total=num_items)
     ppin_queue = mp.Queue(num_workers*2)
