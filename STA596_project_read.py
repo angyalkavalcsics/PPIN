@@ -18,19 +18,23 @@ from sklearn import ensemble
 from sklearn import decomposition
 
 
+# establish constants for dealing with subsets
+sub_key = 'Taxonomy Level 2'
+sub_value = 'Bacteria_Proteobacteria'
+
+
 # NOTE: change these to work for your file paths
-path = 'D:/classes/STA-596/project/data/'
-in_df = pd.read_pickle(f'{path}species_data.output.pickle')
+data_path = 'D:/classes/STA-596/project/data/'
+src_path = f'{data_path}species_data.output.pickle'
+X_path = f'{data_path}{sub_value}.pickle'
 
 
 # extract and merge data
-sub_key = 'Taxonomy Level 2'
-sub_value = 'Bacteria_Proteobacteria'
-sub_df = in_df[in_df[sub_key] == sub_value]
-merged = pd.merge(
-    pd.read_pickle(f'{path}{sub_value}.pickle').fillna(0),
-    in_df[in_df[sub_key] == sub_value].set_index('Species_ID')['Evolution'],
-    on='Species_ID')
+src_df = pd.read_pickle(src_path)
+sub_df = src_df[src_df[sub_key] == sub_value]
+X = pd.read_pickle(X_path).fillna(0)
+y = sub_df.set_index('Species_ID')['Evolution']
+merged = pd.merge(X, y, on='Species_ID')
 X = merged.drop(columns=['Evolution','Species_ID'])
 y = merged['Evolution']
 
