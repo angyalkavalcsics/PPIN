@@ -14,10 +14,12 @@ from collections import Counter
 import multiprocessing as mp
 import queue
 import tqdm
+from memory_profiler import profile
 
 
 # Cliques
-        
+
+@profile
 def get_clique_count_df(G,as_df=False,maximal=False):
     clique_counts = Counter()
     for clique in nx.find_cliques(G) if maximal else nx.enumerate_all_cliques(G):
@@ -33,6 +35,7 @@ def get_clique_count_df(G,as_df=False,maximal=False):
 
 # Degree
 
+@profile
 def get_degree_hist(G,as_df=False):
     degree = nx.degree_histogram(G)
     if as_df:
@@ -63,7 +66,8 @@ class Producer(mp.Process):
         self.ppins = ppins
         self.num_workers = num_workers
         self.ppin_queue = ppin_queue
-        
+    
+    @profile
     def run(self):
         try:
             for i, ppin in self.ppins.items():
@@ -85,9 +89,9 @@ class Worker(mp.Process):
         self.ppin_queue = ppin_queue
         self.row_queue = row_queue
 
+    @profile
     def run(self):
         try:
-            pid = os.getpid()
             while True:
                 try:
                     ppin = self.ppin_queue.get_nowait()
@@ -165,15 +169,15 @@ class Worker(mp.Process):
             pass
 
 class Consumer(mp.Process):
-    def __init__(self, num_workers, row_queue, result_queue, update_queue):
+    def __init__(self, num_workers, row_queue, result_queue):
         super().__init__()
         self.daemon = True
         self.num_workers = num_workers
         self.row_queue = row_queue
         self.result_queue = result_queue
-        self.update_queue = update_queue
         self.df = pd.DataFrame()
 
+    @profile
     def run(self):
         try:
             remaining_workers = self.num_workers
@@ -183,12 +187,11 @@ class Consumer(mp.Process):
                     if row is None:
                         remaining_workers -= 1
                         if remaining_workers == 0:
-                            self.result_queue.put(self.df)
-                            self.update_queue.put(None)
+                            self.result_queue.put(None)
                             break
                     else:
                         self.df = pd.concat([self.df, row], ignore_index=True)
-                        self.update_queue.put(True)
+                        self.result_queue.put(self.df)
                 except queue.Empty:
                     sleep(.5)
         except KeyboardInterrupt:

@@ -26,16 +26,18 @@ from time import sleep
 from collections import Counter
 import multiprocessing as mp
 import queue
+from memory_profiler import profile
+
 
 path = 'D:/classes/STA-596/project/'
 sys.path.append(path)
 import defs
 
-
-prior_X = pd.read_pickle(f'{path}/Bacteria_Proteobacteria_10.pickle')
-
+@profile
 def main():
     in_df = pd.read_pickle(path + 'data/species_data.output.pickle')
+    prior_X = pd.read_pickle(f'{path}/Bacteria_Proteobacteria_482.pickle')
+    prior_item_count = prior_X.shape[0]
     
     # select subset
     sub_key = 'Taxonomy Level 2'
@@ -43,19 +45,20 @@ def main():
     num_items = -1
     sub_df = in_df.loc[in_df[sub_key] == sub_value]
     if num_items > 0:
-        sub_df = sub_df.iloc[:num_items, :]
+        sub_df = sub_df.iloc[prior_item_count:num_items,:]
     else:
-        num_items = sub_df.shape[0]
+        sub_df = sub_df.iloc[prior_item_count:,:]
+    
+    num_items = sub_df.shape[0]
     ppins = sub_df['Matrix']
     
     cores = mp.cpu_count()
-    num_workers = max(1, cores//2)
+    num_workers = 1#max(1, cores//2)
     
     progress = tqdm(total=num_items)
     ppin_queue = mp.Queue(num_workers*2)
     row_queue = mp.Queue(num_workers*2)
     result_queue = mp.Queue()
-    update_queue = mp.Queue()
 
     # start producer
     producer = defs.Producer(ppins,  num_workers, ppin_queue)
@@ -67,24 +70,24 @@ def main():
         worker = defs.Worker(ppin_queue, row_queue)
         worker.start()
         workers.append(worker)
-        
+    
     # start consumer
     consumer = defs.Consumer(
         num_workers,
         row_queue,
         result_queue,
-        update_queue,
         )
     consumer.start()
     
     # get progress updates
     while True:
         try:
-            item = update_queue.get_nowait()
-            if item is None:
-                progress.close()
+            X = result_queue.get_nowait()
+            if X is None:
                 break
             else:
+                X['Species_ID'] = sub_df.reset_index()['Species_ID']
+                pickle.dump(pd.concat([X,prior_X]), open(f'{path}{sub_value}_{num_items}.pickle', 'wb'))
                 if not progress.update():
                     progress.refresh()
         except queue.Empty:
@@ -94,13 +97,7 @@ def main():
     for worker in workers:
         worker.join()
     consumer.join()
-    
-    X = result_queue.get()
-    
     progress.close()
-    
-    X['Species_ID'] = sub_df.reset_index()['Species_ID']
-    pickle.dump(X, open(f'{path}{sub_value}_{num_items}.pickle', 'wb'))
 
 if __name__ == "__main__":
     mp.freeze_support()
