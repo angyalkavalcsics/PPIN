@@ -57,36 +57,36 @@ class HistStats:
 class Producer(mp.Process):
     def __init__(
             self,
-            ppins,
+            df,
             num_workers,
-            ppin_queue,
+            df_queue,
             ):
         super().__init__()
         self.daemon = True
-        self.ppins = ppins
+        self.df = df
         self.num_workers = num_workers
-        self.ppin_queue = ppin_queue
+        self.df_queue = df_queue
     
     @profile
     def run(self):
         try:
-            for i, ppin in self.ppins.items():
+            for i in range(self.df.shape[0]):
                 while True:
                     try:
-                        self.ppin_queue.put_nowait(ppin)
+                        self.df_queue.put_nowait(self.df.iloc[[i]])
                         break
                     except queue.Full:
                         sleep(.5)
             for i in range(self.num_workers):
-                self.ppin_queue.put(None)
+                self.df_queue.put(None)
         except KeyboardInterrupt:
             pass
     
 class Worker(mp.Process):
-    def __init__(self, ppin_queue, row_queue):
+    def __init__(self, df_queue, row_queue):
         super().__init__()
         self.daemon = True
-        self.ppin_queue = ppin_queue
+        self.df_queue = df_queue
         self.row_queue = row_queue
 
     @profile
@@ -94,15 +94,17 @@ class Worker(mp.Process):
         try:
             while True:
                 try:
-                    ppin = self.ppin_queue.get_nowait()
-                    if ppin is None:
+                    df = self.df_queue.get_nowait()
+                    if df is None:
                         self.row_queue.put(None)
                         break
                     
                     # build row
                     row = {}
+                    row['Species_ID'] = df['Species_ID'].iloc[0]
                     
                     # derive largest connected subgraph
+                    ppin = df['Matrix'].iloc[0]
                     G = nx.convert_matrix.from_numpy_matrix(ppin.todense())
                     lcsg = G.subgraph(max(nx.connected_components(G), key=len))
                     

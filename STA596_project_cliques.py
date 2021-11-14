@@ -36,7 +36,7 @@ import defs
 @profile
 def main():
     in_df = pd.read_pickle(path + 'data/species_data.output.pickle')
-    prior_X = pd.read_pickle(f'{path}/Bacteria_Proteobacteria_482.pickle')
+    prior_X = pd.DataFrame()#pd.read_pickle(f'{path}/Bacteria_Proteobacteria_482.pickle')
     prior_item_count = prior_X.shape[0]
     
     # select subset
@@ -48,26 +48,26 @@ def main():
         sub_df = sub_df.iloc[prior_item_count:num_items,:]
     else:
         sub_df = sub_df.iloc[prior_item_count:,:]
+
     
     num_items = sub_df.shape[0]
-    ppins = sub_df['Matrix']
     
     cores = mp.cpu_count()
     num_workers = 3#max(1, cores//2)
     
     progress = tqdm(total=num_items)
-    ppin_queue = mp.Queue(num_workers*2)
+    df_queue = mp.Queue(num_workers*2)
     row_queue = mp.Queue(num_workers*2)
     result_queue = mp.Queue()
 
     # start producer
-    producer = defs.Producer(ppins,  num_workers, ppin_queue)
+    producer = defs.Producer(sub_df, num_workers, df_queue)
     producer.start()
     
     # start workers
     workers = []
     for i in (range(num_workers)):
-        worker = defs.Worker(ppin_queue, row_queue)
+        worker = defs.Worker(df_queue, row_queue)
         worker.start()
         workers.append(worker)
     
@@ -86,7 +86,6 @@ def main():
             if X is None:
                 break
             else:
-                X['Species_ID'] = sub_df.reset_index()['Species_ID']
                 pickle.dump(pd.concat([X,prior_X]), open(f'{path}{sub_value}_{num_items}.pickle', 'wb'))
                 if not progress.update():
                     progress.refresh()
