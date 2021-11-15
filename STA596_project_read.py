@@ -21,12 +21,13 @@ from sklearn import decomposition
 # establish constants for dealing with subsets
 sub_key = 'Taxonomy Level 2'
 sub_value = 'Bacteria_Proteobacteria'
+sub_value = 'Eukaryota_Opisthokonta'
 
 
 # NOTE: change these to work for your file paths
 data_path = 'D:/classes/STA-596/project/data/'
-src_path = f'{data_path}species_data.output.pickle'
-X_path = f'{data_path}{sub_value}.pickle'
+src_path = f'{data_path}/species_data.output.pickle'
+X_path = f'{data_path}/{sub_key}^{sub_value}.pickle'
 
 
 # extract and merge data
@@ -49,9 +50,12 @@ sns.pairplot(X[compare], kind="reg", diag_kind="kde")
 
 
 # ---- SLR
-sparse_col = re.compile('(mc|d)_\d+$')
+sparse_cols = []
+sparse_col_pattern = re.compile('(mc|d)_\d+$')
 for col in X.columns[1:]:
-    if sparse_col.match(col): continue
+    if sparse_col_pattern.match(col):
+        sparse_cols.append(col)
+        continue
     print('\n')
     model = sm.OLS(y, X[col])
     est = model.fit()
@@ -68,7 +72,7 @@ m = ensemble.BaggingRegressor()
 m.fit(X,y)
 
 yhat = m.predict(X)
-np.mean((y - yhat)**2) # 0.007
+np.mean((y - yhat)**2)
 
 feature_importances = np.mean([
     tree.feature_importances_ for tree in m.estimators_

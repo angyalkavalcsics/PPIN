@@ -9,11 +9,8 @@ import re
 import pandas as pd
 import pickle
 import numpy as np
-import networkx as nx
 import seaborn as sns
 import matplotlib.pyplot as plt
-import networkx.algorithms.community as nx_comm
-from networkx.algorithms.flow import shortest_augmenting_path
 import statsmodels.api as sm
 import sklearn as sk
 from sklearn import linear_model
@@ -27,22 +24,36 @@ from collections import Counter
 import multiprocessing as mp
 import queue
 from memory_profiler import profile
+import shutil
 
 
-path = 'D:/classes/STA-596/project/'
-sys.path.append(path)
+# NOTE: change paths as needed
+project_path = 'D:/classes/STA-596/project/'
+tmp_path = f'{project_path}tmp/'
+data_path = f'{project_path}data/'
+
+
+# import local code (to satisfy requirements of parallelism)
+sys.path.append(project_path)
 import defs
 
-@profile
-def main():
-    in_df = pd.read_pickle(path + 'data/species_data.output.pickle')
-    prior_X = pd.DataFrame()#pd.read_pickle(f'{path}/Bacteria_Proteobacteria_482.pickle')
+
+def calculate(
+        in_df,
+        sub_key,
+        sub_value,
+        num_items=-1,
+        prior_item_count=0, # used to resume prior execution
+    ):
+    file_prefix = f'{tmp_path}/{sub_key}^{sub_value}'
+    
+    if prior_item_count == 0:
+        prior_X = pd.DataFrame()
+    else:
+        prior_X = pd.read_pickle(f'{file_prefix}_{prior_item_count}.pickle')
     prior_item_count = prior_X.shape[0]
     
     # select subset
-    sub_key = 'Taxonomy Level 2'
-    sub_value = 'Bacteria_Proteobacteria'
-    num_items = -1
     sub_df = in_df.loc[in_df[sub_key] == sub_value]
     if num_items > 0:
         sub_df = sub_df.iloc[prior_item_count:num_items,:]
@@ -51,6 +62,7 @@ def main():
 
     
     num_items = sub_df.shape[0]
+    out_path = f'{file_prefix}_{num_items}.pickle'
     
     cores = mp.cpu_count()
     num_workers = 3#max(1, cores//2)
@@ -86,7 +98,7 @@ def main():
             if X is None:
                 break
             else:
-                pickle.dump(pd.concat([X,prior_X]), open(f'{path}{sub_value}_{num_items}.pickle', 'wb'))
+                pickle.dump(pd.concat([X,prior_X]), open(out_path, 'wb'))
                 if not progress.update():
                     progress.refresh()
         except queue.Empty:
@@ -97,6 +109,30 @@ def main():
         worker.join()
     consumer.join()
     progress.close()
+
+
+@profile
+def main():
+    src_df = pd.read_pickle(f'{tmp_path}/species_data.output.pickle')
+    
+    
+    # ---- spot-calculate single subset
+    # calculate(src_df,'Taxonomy Level 2','Bacteria_Proteobacteria')
+    
+    
+    # ---- iterate over subsets
+    sub_key = 'Taxonomy Level 2'
+    for sub_value in len(src_df[sub_key].unique()):
+        calculate(src_df,sub_key,sub_value)
+        
+    
+    # ---- copy from tmp to data
+    # tmp_file_pattern = re.compile('(.+)\^(.+)_\d+\.pickle$')
+    # for tmp_file in os.listdir(tmp_path):
+    #     match = tmp_file_pattern.match(tmp_file)
+    #     if match:
+    #         out_file = f'{data_path}{match.group(1)}^{match.group(2)}.pickle'
+    #         shutil.copy(f'{tmp_path}{tmp_file}', out_file)
 
 if __name__ == "__main__":
     mp.freeze_support()
