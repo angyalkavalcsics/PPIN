@@ -113,7 +113,7 @@ def calculate(
 
 @profile
 def main():
-    src_df = pd.read_pickle(f'{tmp_path}/species_data.output.pickle')
+    src_df = pd.read_pickle(f'{data_path}species_data.output.pickle')
     
     
     # ---- spot-calculate single subset
@@ -122,7 +122,7 @@ def main():
     
     # ---- iterate over subsets
     sub_key = 'Taxonomy Level 2'
-    for sub_value in len(src_df[sub_key].unique()):
+    for sub_value in src_df[sub_key].unique():
         calculate(src_df,sub_key,sub_value)
         
     
