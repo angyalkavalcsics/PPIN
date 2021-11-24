@@ -259,7 +259,7 @@ np.mean((y - yhat)**2) # 0.046
 
 ###############################################################################
 # Fit a tree
-m = ensemble.BaggingRegressor()
+m = ensemble.RandomForestRegressor(max_depth=4)
 m.fit(X,y)
 
 # Find significant predictors
@@ -274,86 +274,85 @@ for i in np.argsort(feature_importances)[::-1]:
     print(f'\t{X.columns[i]}: {feature_importances[i]:.3f}')
     
 '''
-    num_6stars: 0.165
-	Clique Count: 0.161
-	Node Count: 0.077
-	Modularity: 0.066
-	num_1stars: 0.065
-	LCSG Clique-Size Mean: 0.061
-	num_59stars: 0.045
-	num_15stars: 0.039
-	num_4stars: 0.030
-	num_12stars: 0.020
-	num_2stars: 0.019
-	LCSG Degree Mean: 0.018
-	LCSG Degree Max: 0.018
-	Clique-Size Max: 0.017
-	GiantProportion: 0.016
-	LCSG Clique-Size Max: 0.016
-	num_8stars: 0.015
-	num_7stars: 0.014
-	num_11stars: 0.011
-	num_28stars: 0.009
-	num_9stars: 0.009
-	num_22stars: 0.008
-	num_25stars: 0.008
-	num_27stars: 0.008
-	num_10stars: 0.007
-	num_23stars: 0.007
-	num_16stars: 0.007
-	num_58stars: 0.005
-	num_38stars: 0.005
-	Clique-Size Mean: 0.005
-	num_63stars: 0.004
-	num_37stars: 0.003
-	num_18stars: 0.003
-	LCSG Node Count: 0.003
-	LCSG Clique-Size Mode: 0.003
-	Average Closed Triangles: 0.002
-	num_41stars: 0.002
-	num_53stars: 0.002
-	Average Centrality: 0.002
-	num_36stars: 0.002
-	num_21stars: 0.002
-	num_76stars: 0.002
-	LCSG Clique Count: 0.002
-	num_30stars: 0.001
-	num_39stars: 0.001
-	num_31stars: 0.001
-	num_19stars: 0.001
-	num_17stars: 0.001
-	LCSG Degree Mode: 0.001
-	num_3stars: 0.001
-	num_5stars: 0.001
-	num_33stars: 0.001
+    	num_1stars: 0.131
+	Modularity: 0.115
+	num_6stars: 0.088
+	num_59stars: 0.052
+	Node Count: 0.040
+	Clique Count: 0.040
+	num_3stars: 0.028
+	num_14stars: 0.025
+	num_31stars: 0.023
+	Average Centrality: 0.022
+	num_7stars: 0.022
+	num_15stars: 0.021
+	LCSG Clique-Size Mean: 0.019
+	num_2stars: 0.017
+	num_12stars: 0.017
+	Average Closed Triangles: 0.016
+	LCSG Degree Max: 0.016
+	num_56stars: 0.015
+	num_21stars: 0.015
+	num_51stars: 0.015
+	num_60stars: 0.014
+	Clique-Size Max: 0.013
+	num_9stars: 0.013
+	GiantProportion: 0.012
+	num_24stars: 0.012
+	LCSG Clique-Size Max: 0.011
+	num_16stars: 0.011
+	num_19stars: 0.010
+	Clique-Size Mean: 0.010
+	num_33stars: 0.010
+	LCSG Degree Mode: 0.010
+	num_11stars: 0.010
+	num_5stars: 0.009
+	num_4stars: 0.009
+	LCSG Degree Mean: 0.008
+	num_18stars: 0.008
+	num_13stars: 0.007
+	LCSG Clique Count: 0.007
+	num_10stars: 0.006
+	num_41stars: 0.005
+	num_54stars: 0.005
+	num_22stars: 0.005
+	LCSG Node Count: 0.005
+	num_23stars: 0.005
+	num_63stars: 0.005
+	num_37stars: 0.004
+	num_52stars: 0.004
+	num_30stars: 0.004
+	num_17stars: 0.003
+	num_48stars: 0.003
+	num_28stars: 0.003
+	num_38stars: 0.003
+	num_27stars: 0.002
+	num_25stars: 0.002
+	num_8stars: 0.002
+	num_32stars: 0.002
+	num_57stars: 0.002
+	num_34stars: 0.002
+	num_26stars: 0.001
+	Clique-Size Mode: 0.001
+	num_29stars: 0.001
+	num_40stars: 0.001
+	num_36stars: 0.001
+	num_35stars: 0.001
 	num_55stars: 0.001
-	num_20stars: 0.001
-	num_14stars: 0.001
-	num_40stars: 0.000
-	num_29stars: 0.000
-	num_48stars: 0.000
-	num_35stars: 0.000
-	num_44stars: 0.000
-	num_13stars: 0.000
+	num_42stars: 0.001
+	num_43stars: 0.001
+	num_75stars: 0.000
 	num_45stars: 0.000
-	num_62stars: 0.000
-	num_34stars: 0.000
+	num_20stars: 0.000
+	num_53stars: 0.000
+	num_79stars: 0.000
 	num_50stars: 0.000
-	num_60stars: 0.000
-	num_26stars: 0.000
-	num_56stars: 0.000
-	num_24stars: 0.000
-	num_54stars: 0.000
-	num_47stars: 0.000
-	Clique-Size Mode: 0.000
-	num_43stars: 0.000
-	num_51stars: 0.000
-	num_61stars: 0.000
-	num_32stars: 0.000
+	num_49stars: 0.000
+	LCSG Clique-Size Mode: 0.000
+	num_44stars: 0.000
 	num_46stars: 0.000
-	num_77stars: 0.000
-	num_52stars: 0.000
-	num_66stars: 0.000
+	num_89stars: 0.000
+	num_39stars: 0.000
 '''
 
 # Find training error
@@ -369,17 +368,19 @@ compare = {
     'Modularity',
     'num_1stars',
     'Node Count',
-    'LCSG Node Count',
+    'Clique Count',
     }
 
 pp = sns.pairplot(X[compare], kind="reg", diag_kind="kde")
 pp.fig.suptitle("Pairwise Relationships", y=1.00)
 
 ###############################################################################
+# df visualizations 
+df1_vis = np.round(df1.head().T, 3)
+print(df1_vis.to_latex(index=True))  
 
-
-
-
+df2_vis = np.round(df2.head().T.iloc[:6,:], 3)
+print(df2_vis.to_latex(index=True)) 
 
 
 
