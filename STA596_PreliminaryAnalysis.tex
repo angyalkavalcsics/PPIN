@@ -7,8 +7,8 @@
 \usepackage{amsthm}
 \usepackage{booktabs}
 \usepackage{wrapfig}
-\usepackage{algorithm}
-\usepackage{algorithmic}
+\usepackage{algorithm}% http://ctan.org/pkg/algorithms
+\usepackage{algpseudocode}% http://ctan.org/pkg/algorithmicx
 \usepackage{xcolor}
 \usepackage[colorlinks = true,
             linkcolor = blue,
@@ -29,8 +29,8 @@
 \renewcommand{\thesection}{\Roman{section}} 
 \renewcommand{\thesubsection}{\thesection.\Roman{subsection}}
 \usepackage{titlesec}
-\titleformat*{\section}{\fontsize{12}{20}\selectfont}
-\titleformat*{\subsection}{\fontsize{12}{17}\selectfont}
+\titleformat*{\section}{\fontsize{12}{5}\selectfont}
+\titleformat*{\subsection}{\fontsize{12}{5}\selectfont}
 \titlelabel{\thetitle.\enspace}
 \usepackage{etoolbox}
 \patchcmd{\thebibliography}{\section*}{\section}{}{}
@@ -47,6 +47,7 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{xcolor}
+
 \usepackage{indentfirst}
 
 \begin{document}
@@ -93,7 +94,7 @@ Jesse, briefly we should both talk about how we got the two separate dfs with al
 
 \subsection{Models}
 Our research question aims to find network statistics, which measure topological stability of the species’ protein interactome, that are significant predictors of the evolutionary time of a species. That is, we suspect that there is a relationship between some of these network statistics and the response--evolutionary time. The nature of our data is that there are more features than data points. For this reason we need models that work well with such data--we need models which perform feature selection. 
-
+Here I would like to explain what the ERGM is (using the pdf in the references below)   and how we used it, as well as explain how we concatenated the two dfs above together
 
 \section{Preliminary Results}
 LASSO info
@@ -102,7 +103,7 @@ Random forest info
 Need to talk about how we plan to fine-tune the above models over the next two weeks here. I.e. Adding CV to lasso and tuning hyperparameters of random forest using RandomizedSearchCV.
 \section{Appendix}
 \subsection{Predictors Using NetworkX}
-Below is a nice way to print a pandas df to TeX.
+
 \begin{table}[H]
 \centering
 \caption{Predictors Using NetworkX Data Frame}
@@ -130,7 +131,17 @@ LCSG Degree Mean         &     9.465 &     9.661 &    5.060 &    4.144 &   10.59
 \end{tabular}
 \end{table}
 \subsection{K-Stars Algorithm}
-Here I will write pseudocode for the k-stars functions and also provide a table. 
+Below it pseudocode for how we constructed the data frame of stars counts for each network.
+\begin{algorithm}
+\caption{Get Stars Algorithm}\label{alg:cap}
+\begin{algorithmic}
+\State $\text{giantC } \gets \text{ giant component for undirected network}$
+\State $\text{A } \gets \text{ convert giantC to adjacency matrix}$
+\State $\text{d } \gets \text{ sum row elements of A}$
+\State $\text{values, counts } \gets \text{ find unique elements and counts for each}$
+\State $\text{stars } \gets \text{ pandas DataFrame of counts with index names being values}$
+\end{algorithmic}
+\end{algorithm}
 \begin{table}[H]
 \centering
 \caption{Count K-Stars Data Frame}
@@ -141,16 +152,11 @@ Species\_ID &  882   &  883   &  36870 &  52598 &  56780 & $\cdots$\\
 num\_1stars &  109.0 &   39.0 &   22.0 &   17.0 &   26.0 & $\cdots$\\
 num\_2stars &  105.0 &   57.0 &   54.0 &   30.0 &   70.0 & $\cdots$\\
 num\_3stars &   65.0 &   63.0 &   31.0 &   20.0 &   53.0 & $\cdots$\\
-num\_4stars &   72.0 &   41.0 &   15.0 &   19.0 &   40.0 & $\cdots$\\
-num\_5stars &   47.0 &   22.0 &   14.0 &   17.0 &   46.0 & $\cdots$\\
-num\_6stars &   30.0 &   26.0 &   11.0 &    1.0 &   40.0 & $\cdots$\\
 $\vdots$ &   $\vdots$ &   $\vdots$ &   $\vdots$ &    $\vdots$ &   $\vdots$ & $\ddots$\\
 \bottomrule
 \end{tabular}
 \end{table}
-\subsection{Exponential Random Graph Model}
-Here I would like to explain what the ERGM is (using the pdf in the references below)   and how we used it, as well as explain how we concatenated the two dfs above together.
-
+It is important to note that the maximum star count is unique to each network so when we concatenate these smaller data frames together to form the data frame which holds all network statistics it must be dynamic. Additionally, this means that once we train the model--if we choose to include all star variables--then we cannot test the model on a new set of networks. A quick fix for this may be to only include the first ten rows of this data frame. 
 \begin{thebibliography}{1}
  \bibitem{1} Evolution of resilience in protein interactomes across the tree of life
 Marinka Zitnik, Rok Sosič, Marcus W. Feldman, Jure Leskovec
