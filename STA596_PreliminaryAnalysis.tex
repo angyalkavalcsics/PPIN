@@ -79,7 +79,7 @@ Understanding how protein interactomes evolve and developing methods for analyzi
 
 \section{Methods}
 \subsection{Acquisition of Data}
-Our dataset comes from the Stanford Network Analysis Platform (or SNAP). This data was collected using the Search Tool for the Retrieval of Interacting Genes/Proteins (or STRING), from the European Molecular Biology Laboratory, EMBL and is organized in multiple text files, joined by species ID. It comprises taxonomy information, an edge set for each interactome, and a numerical variable for evolutionary time of the species. 
+Our dataset comes from the Stanford Network Analysis Platform (or SNAP). This data was collected using the Search Tool for the Retrieval of Interacting Genes/Proteins (or STRING), from the European Molecular Biology Laboratory, EMBL and is organized in multiple text files, joined by species ID. It comprises taxonomy information, an edge set for each interactome, and a numerical variable for evolutionary time of the species. \newpage
 
 \begin{wrapfigure}{r}{0.5\textwidth}
   \includegraphics[width=0.95\linewidth]{PPIN_fig1}
@@ -131,7 +131,7 @@ LCSG Degree Mean         &     9.465 &     9.661 &    5.060 &    4.144 &   10.59
 \end{tabular}
 \end{table}
 \subsection{K-Stars Algorithm}
-Below it pseudocode for how we constructed the data frame of stars counts for each network.
+Below is pseudocode for how we constructed the data frame of stars counts for each network.
 \begin{algorithm}
 \caption{Get Stars Algorithm}\label{alg:cap}
 \begin{algorithmic}
@@ -156,12 +156,12 @@ $\vdots$ &   $\vdots$ &   $\vdots$ &   $\vdots$ &    $\vdots$ &   $\vdots$ & $\d
 \bottomrule
 \end{tabular}
 \end{table}
-It is important to note that the maximum star count is unique to each network so when we concatenate these smaller data frames together to form the data frame which holds all network statistics it must be dynamic. Additionally, this means that once we train the model--if we choose to include all star variables--then we cannot test the model on a new set of networks. A quick fix for this may be to only include the first ten rows of this data frame. 
+It is important to note that the maximum star count is unique to each network so when we concatenate these smaller data frames together to form the data frame which holds all network statistics it must be dynamic. Additionally, this means that once we train the model--if we choose to include all star variables--then we cannot test the model on a new set of networks. A quick fix for this may be to only include the first ten rows of this data frame. \newpage
 \begin{thebibliography}{1}
- \bibitem{1} Evolution of resilience in protein interactomes across the tree of life
-Marinka Zitnik, Rok Sosič, Marcus W. Feldman, Jure Leskovec
-bioRxiv 454033; doi: \url{https://doi.org/10.1101/454033}
-\bibitem{2} Rohan Maddamsetti, Selection Maintains Protein Interactome Resilience in the Long-Term Evolution Experiment with Escherichia coli, Genome Biology and Evolution, Volume 13, Issue 6, June 2021, evab074, \url{https://doi.org/10.1093/gbe/evab074}
+ \bibitem{1} Zitnik, M., Sosič, R., Feldman, M. W., Leskovec, J. (2019). Evolution of resilience in protein interactomes across the tree of life. Proceedings of the National Academy of Sciences, 116(10), 4426-4433. \url{https://doi.org/10.1101/454033}
+\bibitem{2} Maddamsetti, R. (2021). Selection maintains protein interactome resilience in the long-term evolution experiment with Escherichia coli. \url{https://doi.org/10.1093/gbe/evab074}
+\bibitem{3} Evolution of protein interactomes across the tree of life. (n.d.). Retrieved from \url{http://snap.stanford.edu/tree-of-life/}
+\bibitem{4} Sumit Mukherjee. (2011). Exponential Random graph models. Retrieved from \url{https://artowen.su.domains/courses/319/smukherjee.pdf}
   \end{thebibliography}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
