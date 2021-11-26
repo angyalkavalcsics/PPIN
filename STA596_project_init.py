@@ -87,22 +87,21 @@ def get_df1(adj):
         centrality = nx.degree_centrality(giantC)
         centrality_df = pd.DataFrame.from_dict(centrality, orient='index')
         avg_centrality = np.mean(centrality_df.iloc[:, 0])
-        
-        triangles = nx.triangles(giantC)
-        avg_triangles = np.mean(list(triangles.values()))
+        # fixed 11/26
+        num_triangles = int(sum(nx.triangles(giantC).values()) / 3)
         
         modularity = nx_comm.modularity(giantC, 
                                         nx_comm.label_propagation_communities(giantC))
         
         clique_size = HistStats(get_clique_count_df(G), 'clique_size')
         lcsg_clique_size = HistStats(get_clique_count_df(giantC), 'clique_size')
-        
-        degree_stats = HistStats(get_degree_hist(G), 'degree')
+        # same as 1-stars (repeat)
+        #degree_stats = HistStats(get_degree_hist(G), 'degree')
         lcsg_degree_stats = HistStats(get_degree_hist(giantC), 'degree')
         
         predictors.append([
             avg_centrality,
-            avg_triangles,
+            num_triangles,
             modularity,
             clique_size.count,
             clique_size.max,
@@ -112,7 +111,6 @@ def get_df1(adj):
             lcsg_clique_size.max,
             lcsg_clique_size.mode,
             lcsg_clique_size.mean,
-            degree_stats.count,
             lcsg_degree_stats.count,
             lcsg_degree_stats.max,
             lcsg_degree_stats.mode,
@@ -154,7 +152,7 @@ def get_df2(adj):
 predictors = get_df1(adj_train)
 df1 = pd.DataFrame(predictors, index = reduced_df['Species_ID'], columns=[
     'Average Centrality',
-    'Average Closed Triangles',
+    'Number of Triangles',
     'Modularity',
     'Clique Count',
     'Clique-Size Max',
@@ -164,7 +162,6 @@ df1 = pd.DataFrame(predictors, index = reduced_df['Species_ID'], columns=[
     'LCSG Clique-Size Max',
     'LCSG Clique-Size Mode',
     'LCSG Clique-Size Mean',
-    'Node Count',
     'LCSG Node Count',
     'LCSG Degree Max',
     'LCSG Degree Mode',
@@ -188,7 +185,7 @@ as powerful as modularity (as meaured by SLR R^2). We might expect this is
 another way to measure connectivity/resiliency of the proteome.
 '''
 
-X['GiantProportion'] = X['LCSG Node Count']/X['Node Count']
+X['GiantProportion'] = X['LCSG Node Count']/X['num_1stars']
 
 ###############################################################################
 '''
@@ -214,7 +211,7 @@ adj_test = test_df.iloc[:, 8]
 predictors_test = get_df1(adj_test)
 df1_test = pd.DataFrame(predictors_test, index = test_df['Species_ID'], columns=[
     'Average Centrality',
-    'Average Closed Triangles',
+    'Number of Triangles',
     'Modularity',
     'Clique Count',
     'Clique-Size Max',
@@ -224,7 +221,6 @@ df1_test = pd.DataFrame(predictors_test, index = test_df['Species_ID'], columns=
     'LCSG Clique-Size Max',
     'LCSG Clique-Size Mode',
     'LCSG Clique-Size Mean',
-    'Node Count',
     'LCSG Node Count',
     'LCSG Degree Max',
     'LCSG Degree Mode',
@@ -247,15 +243,15 @@ coefs = pd.DataFrame(mod.coef_, index = X.columns, columns= ['coefs'])
 coefs.index[np.nonzero(np.array(coefs))[0]]
 
 '''
-Index(['Average Closed Triangles', 'Clique Count', 'LCSG Clique Count',
-       'Node Count', 'LCSG Node Count', 'num_1stars'],
+Index(['Number of Triangles', 'Clique Count', 'LCSG Clique Count',
+       'LCSG Node Count', 'LCSG Degree Max', 'num_1stars'],
       dtype='object')
 '''
 
 # Find training error
 
 yhat = mod.predict(X)
-np.mean((y - yhat)**2) # 0.046
+np.mean((y - yhat)**2) # 0.05
 
 ###############################################################################
 # Fit a tree
@@ -269,96 +265,45 @@ feature_importances = np.mean([
 ], axis=0)
 
 for i in np.argsort(feature_importances)[::-1]:
-    if feature_importances[i] == 0:
+    if feature_importances[i] < 0.01:
         break
     print(f'\t{X.columns[i]}: {feature_importances[i]:.3f}')
     
-'''
-    	num_1stars: 0.131
-	Modularity: 0.115
-	num_6stars: 0.088
-	num_59stars: 0.052
-	Node Count: 0.040
-	Clique Count: 0.040
-	num_3stars: 0.028
+'''	
+	num_1stars: 0.119
+	Modularity: 0.106
+	num_6stars: 0.091
+	Clique Count: 0.063
+	LCSG Clique-Size Mean: 0.044
+	num_59stars: 0.044
+	num_31stars: 0.034
+	Average Centrality: 0.029
+	num_15stars: 0.026
 	num_14stars: 0.025
-	num_31stars: 0.023
-	Average Centrality: 0.022
-	num_7stars: 0.022
-	num_15stars: 0.021
-	LCSG Clique-Size Mean: 0.019
-	num_2stars: 0.017
-	num_12stars: 0.017
-	Average Closed Triangles: 0.016
-	LCSG Degree Max: 0.016
-	num_56stars: 0.015
-	num_21stars: 0.015
-	num_51stars: 0.015
-	num_60stars: 0.014
-	Clique-Size Max: 0.013
-	num_9stars: 0.013
-	GiantProportion: 0.012
-	num_24stars: 0.012
-	LCSG Clique-Size Max: 0.011
-	num_16stars: 0.011
-	num_19stars: 0.010
-	Clique-Size Mean: 0.010
-	num_33stars: 0.010
-	LCSG Degree Mode: 0.010
-	num_11stars: 0.010
-	num_5stars: 0.009
-	num_4stars: 0.009
-	LCSG Degree Mean: 0.008
-	num_18stars: 0.008
-	num_13stars: 0.007
-	LCSG Clique Count: 0.007
-	num_10stars: 0.006
-	num_41stars: 0.005
-	num_54stars: 0.005
-	num_22stars: 0.005
-	LCSG Node Count: 0.005
-	num_23stars: 0.005
-	num_63stars: 0.005
-	num_37stars: 0.004
-	num_52stars: 0.004
-	num_30stars: 0.004
-	num_17stars: 0.003
-	num_48stars: 0.003
-	num_28stars: 0.003
-	num_38stars: 0.003
-	num_27stars: 0.002
-	num_25stars: 0.002
-	num_8stars: 0.002
-	num_32stars: 0.002
-	num_57stars: 0.002
-	num_34stars: 0.002
-	num_26stars: 0.001
-	Clique-Size Mode: 0.001
-	num_29stars: 0.001
-	num_40stars: 0.001
-	num_36stars: 0.001
-	num_35stars: 0.001
-	num_55stars: 0.001
-	num_42stars: 0.001
-	num_43stars: 0.001
-	num_75stars: 0.000
-	num_45stars: 0.000
-	num_20stars: 0.000
-	num_53stars: 0.000
-	num_79stars: 0.000
-	num_50stars: 0.000
-	num_49stars: 0.000
-	LCSG Clique-Size Mode: 0.000
-	num_44stars: 0.000
-	num_46stars: 0.000
-	num_89stars: 0.000
-	num_39stars: 0.000
+	GiantProportion: 0.024
+	LCSG Clique-Size Max: 0.020
+	num_2stars: 0.018
+	num_18stars: 0.017
+	num_3stars: 0.016
+	num_7stars: 0.016
+	Clique-Size Max: 0.015
+	num_12stars: 0.015
+	LCSG Clique Count: 0.015
+	num_21stars: 0.014
+	LCSG Degree Max: 0.014
+	Number of Triangles: 0.011
+	num_51stars: 0.011
+	Clique-Size Mean: 0.011
+	num_4stars: 0.011
+	num_27stars: 0.011
+	LCSG Node Count: 0.010
+	num_13stars: 0.010
 '''
 
 # Find training error
 
 yhat = m.predict(X)
-np.mean((y - yhat)**2) # 0.0078
+np.mean((y - yhat)**2) # 0.009
 
 ###############################################################################
 # Pairs plot to show relationship between the common significant 
