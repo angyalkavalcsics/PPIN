@@ -17,20 +17,15 @@ import statsmodels.api as sm
 from sklearn import linear_model
 from sklearn import ensemble
 ###############################################################################
-# TODO: 
-# Run LASSO on some combination of the statistics we found.
-# Can we find any combination that beats modularity as a predictor?
-# Plots?
-###############################################################################
 # Read in file
-unpickled_df = pd.read_pickle("C:/Users/angya/OneDrive/Documents/species_data.output.pickle")
+unpickled_df = pd.read_pickle("yourpath/species_data.output.pickle")
 ###############################################################################
-# Take a subset of the data
-
+# Take a subset of the data 
 bact_prot = unpickled_df.loc[unpickled_df["Taxonomy Level 2"] == "Bacteria_Proteobacteria"]
 reduced_df = bact_prot.iloc[:75, :]
 adj_train = reduced_df.iloc[:, 8]
 ###############################################################################
+# Author: Angyalka
 # Plot PPIN
 n = 31 # controls which species we plot
 first = adj_train.iloc[n].todense()
@@ -48,8 +43,8 @@ nx.draw(giantC, kawai, node_size = 10)
 
 ###############################################################################
 # Cliques
-
-class HistStats:
+# Author: Jesse
+class HistStats: 
     def __init__(self, df, val):
         self.count = df['count'].sum()
         self.max = df[val].max()
@@ -68,37 +63,37 @@ def get_clique_count_df(G):
     return clique_count_df
 
 # Degree
-
-def get_degree_hist(G):
+def get_degree_hist(G): 
     degree = nx.degree_histogram(G)
     degree_df = pd.DataFrame(degree).reset_index()
     degree_df.columns = ['degree', 'count']
     return degree_df
-
+###############################################################################
 # Run this for subset of species and store values
 def get_df1(adj):
     predictors = []
     for i in range(len(adj)):
+        #######################################################################
+        # Author: Angyalka
         temp = adj.iloc[i].todense()
         G = nx.convert_matrix.from_numpy_matrix(temp) 
         Gcc = max(nx.connected_components(G), key=len)
         giantC = G.subgraph(Gcc) 
-        
         centrality = nx.degree_centrality(giantC)
         centrality_df = pd.DataFrame.from_dict(centrality, orient='index')
         avg_centrality = np.mean(centrality_df.iloc[:, 0])
         # fixed 11/26
         num_triangles = int(sum(nx.triangles(giantC).values()) / 3)
-        
         modularity = nx_comm.modularity(giantC, 
                                         nx_comm.label_propagation_communities(giantC))
-        
+        #######################################################################
+        # Author: Jesse
         clique_size = HistStats(get_clique_count_df(G), 'clique_size')
         lcsg_clique_size = HistStats(get_clique_count_df(giantC), 'clique_size')
-        # same as 1-stars (repeat)
+        # same as stars (repeat predictors) 
         #degree_stats = HistStats(get_degree_hist(G), 'degree')
         lcsg_degree_stats = HistStats(get_degree_hist(giantC), 'degree')
-        
+        #######################################################################
         predictors.append([
             avg_centrality,
             num_triangles,
@@ -120,11 +115,11 @@ def get_df1(adj):
 
 ###############################################################################
 # Stars
-
+# Author: Angyalka
 '''
-The S_k is a node with k edges
+A k-star is a node with k edges
 '''
-def getstars(adj):
+def getstars(adj): 
         temp = adj.todense()
         G = nx.convert_matrix.from_numpy_matrix(temp) 
         Gcc = max(nx.connected_components(G), key=len)
@@ -149,7 +144,10 @@ def get_df2(adj):
     stars.index = new_row_names
     return(stars.T)
 
-predictors = get_df1(adj_train)
+###############################################################################
+# Combine data frames of the various stats
+# Author: Angyalka
+predictors = get_df1(adj_train) 
 df1 = pd.DataFrame(predictors, index = reduced_df['Species_ID'], columns=[
     'Average Centrality',
     'Number of Triangles',
@@ -168,15 +166,14 @@ df1 = pd.DataFrame(predictors, index = reduced_df['Species_ID'], columns=[
     'LCSG Degree Mean',
     ])
 
-###############################################################################
-# Combine data frames of the various stats
-
 df2 = get_df2(adj_train)
 df2.index = reduced_df['Species_ID']
 
 X = pd.concat([df1, df2], axis=1)
 
 y = reduced_df['Evolution']
+###############################################################################
+# Author: Jesse
 
 '''
 Trying some meta-stats, it seems like 'GiantProportion' (the proportion of
@@ -187,21 +184,10 @@ another way to measure connectivity/resiliency of the proteome.
 
 X['GiantProportion'] = X['LCSG Node Count']/X['num_1stars']
 
-###############################################################################
-'''
-On the prelim he says:
-    
-After comparing the two methods, you should perform a full analysis of the 
-data including error estimates and other relevant quantities. You should 
-include relevant tables and figures.
 
-Notes:
-* We have one figure above (the graph) and the pairplot below. 
-* I could not get cross validation to work for LASSO -- convergence issue.
-* I found the training error 
-'''
 ###############################################################################
 # Create test data
+# Author: Angyalka
 '''
 # We can't find test error because the number of k-stars would be different
 
@@ -237,6 +223,7 @@ y_test = test_df['Evolution']
 ###############################################################################
 # Fit LASSO
 # Lasso fits an intercept by default
+# Author: Angyalka
 lasso = linear_model.Lasso(alpha = 0.6, max_iter = 10000)
 mod = lasso.fit(X,y)
 coefs = pd.DataFrame(mod.coef_, index = X.columns, columns= ['coefs'])
@@ -255,11 +242,11 @@ np.mean((y - yhat)**2) # 0.05
 
 ###############################################################################
 # Fit a tree
+# Author: Angyalka
 m = ensemble.RandomForestRegressor(max_depth=4)
 m.fit(X,y)
 
 # Find significant predictors
-
 feature_importances = np.mean([
     tree.feature_importances_ for tree in m.estimators_
 ], axis=0)
@@ -308,7 +295,7 @@ np.mean((y - yhat)**2) # 0.009
 ###############################################################################
 # Pairs plot to show relationship between the common significant 
 # predictors from both models
-
+# Author: Jesse
 compare = {
     'Modularity',
     'num_1stars',
@@ -321,21 +308,9 @@ pp.fig.suptitle("Pairwise Relationships", y=1.00)
 
 ###############################################################################
 # df visualizations 
+# Author: Angyalka
 df1_vis = np.round(df1.head().T, 3)
 print(df1_vis.to_latex(index=True))  
 
 df2_vis = np.round(df2.head().T.iloc[:6,:], 3)
 print(df2_vis.to_latex(index=True)) 
-
-
-
-
-
-
-
-
-
-
-
-
-
