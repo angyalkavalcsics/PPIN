@@ -65,7 +65,7 @@
 \item Preliminary Results
 \item Conclusion
 \item Appendix
-\item References \newpage
+\item References\newline
 \end{enumerate}
 
 \section{Introduction}
@@ -81,13 +81,33 @@ Understanding how protein interactomes evolve and developing methods for analyzi
 \subsection{Acquisition of Data}
 Our dataset comes from the Stanford Network Analysis Platform (or SNAP). This data was collected using the Search Tool for the Retrieval of Interacting Genes/Proteins (or STRING), from the European Molecular Biology Laboratory, EMBL and is organized in multiple text files, joined by species ID. It comprises taxonomy information, an edge set for each interactome, and a numerical variable for evolutionary time of the species.
 
-How was the pickle made? After transforming the provided data into workable adjacency matrices, we selected an arbitrary subset of 75 species of Proteobacteria, a major phylum which includes a wide variety of pathogenic genera such as Salmonella. Our goal was to select a subset of networks of relatively small size to control for the computational time of our algorithms. On account of each PPI network supplied in the data being a noisy sample from the true species' protein interactome, we needed to use only the giant connected component for our analysis. That is, we ignored any nodes which were disconnected from the main network, assuming that they were included in the network or left disconnected from the giant component due to experimental error.
 \begin{wrapfigure}{r}{0.5\textwidth}
-  \includegraphics[width=0.95\linewidth]{PPIN_fig1}
+  \includegraphics[width=.9\linewidth]{PPIN_fig1}
+  \caption{An example PPIN}
+  \label{fig:PPIN_fig1}
 \end{wrapfigure}
-To extract pertinent information about network stability from each network we used the concept of Exponential Random Graph Models. The basic assumption of these models is that the structure in an observed network can be explained by a vector of sufficient statistics which are a function of the observed network. To construct our models, we first need to find the vector of sufficient statistics for each network. Using internal functions of NetworkX, a Python library for network analysis, we found statistics for each PPIN. In particular for each PPIN, we found its average degree centrality, number of triangles, modularity, clique count, node count for the largest connected subgraph (lcsg), size of the max clique, and much more as you can see in the appendix.
 
-Average centrality for a network describes the average number of edges for all nodes. In other words, this statistic describes the average number of connections for all nodes. If a network has a high average degree centrality then we interpret this network as being dense with respect to the number of nodes in the network. The number of triangles statistic counts the number of triangles in the network--we sum up the number of triangles each node is a part of then divide this number by three. A triangle is a set of three nodes where each node has a relationship to the other two--this is sometimes referred to as a 3-clique. Networks that have a large number of triangles tend to be highly interconnected. However, networks that have a low number of triangles turn out to be poorly connected and may suffer from instability. The last network statistic we will describe here is modularity. Modularity is a measure of the structure of networks or graphs which measures the strength of division of a network into modules. Networks with high modularity have dense connections between the nodes within modules but sparse connections between nodes in different modules.
+In order to apply common network analysis techniques, we restructured the PPIN data as a series of adjacency matrices. To reduce the computational burden during initial algorithm development, we selected an arbitrary subset of 75 species of Proteobacteria, a major phylum which includes a wide variety of pathogenic genera such as Salmonella. For network statistics that only pertain to connected graphs, we use the largest connected subgraph (or LCSG).
+
+To extract pertinent information about network stability from each network we used the concept of Exponential Random Graph Models. The basic assumption of these models is that the structure in an observed network can be explained by a vector of sufficient statistics which are a function of the observed network. To construct our models, we first need to find the vector of sufficient statistics for each network.
+
+Using internal functions of NetworkX, a Python library for network analysis, we calculated statistics for each PPIN, including: average degree centrality, number of triangles, modularity, and maximal clique stats for the complete network and LCSG (see appendix for complete details). We tried implementing exhaustive enumeration of \textit{all} cliques (as opposed to \textit{maximal} cliques) but found this to be impractical, as the supporting NetworkX algorithm (\textit{enumerate\_all\_cliques}) is memory-bound. We tested this limitation via execution with 64GB of RAM and 3 $Worker$ processes; execution failed with a $MemoryError$ after $\sim8$ hours of processing, when one of a workers attempted to allocate additional memory beyond available capacity (see Figure $\ref{fig:workers}$).
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+  \includegraphics[width=1\linewidth]{workers}
+  \caption{$Worker$ memory usage}
+  \label{fig:workers}
+\end{wrapfigure}
+
+\textbf{Average centrality} for a network describes the average number of edges for all nodes. In other words, this statistic describes the average number of connections for all nodes. If a network has a high average degree centrality then we interpret this network as being dense with respect to the number of nodes in the network.
+
+The \textbf{Number of Triangles} statistic counts the number of triangles in the network--we sum up the number of triangles each node is a part of then divide this number by three. A triangle is a set of three nodes where each node has a relationship to the other two--this is sometimes referred to as a 3-clique. Networks that have a large number of triangles tend to be highly interconnected. However, networks that have a low number of triangles turn out to be poorly connected and may suffer from instability.
+
+\textbf{Modularity} is a measure of the structure of networks or graphs which measures the strength of division of a network into modules. Networks with high modularity have dense connections between the nodes within modules but sparse connections between nodes in different modules.
+
+Cliques are fully connected subgraphs, meaning each node in a clique is directly connected to every other node in the clique. Therefore any clique of size $n>1$ necessarily includes ${n \choose n-1}$ sub-cliques. For our network statistics (e.g. \textbf{Clique-Size Mean}) we only measure maximal cliques, i.e. those cliques which are not sub-cliques of a larger clique. Where clique metrics are derived from the LCSG, the metric name is prefixed with ``LCSG''.
+
+\textbf{GiantProportion} is a simple metric that seems to bring unique information into the model. It is the ratio of nodes in the complete graph that are also members of the LCSG: $\frac{LCSG Node Count}{Total Node Count}$.
 
 Additionally, we wrote a function which would find the number of k-stars in each PPIN from one to the maximum size star in the network. For example, a 1-star is the number of nodes in the network, a 2-star is the number of edges, a 3-star is the number of nodes with three edges, and so on. Finally, we combined all of these statistics into a data matrix for our models.
 
@@ -99,10 +119,10 @@ The first such model we chose is LASSO regression. The LASSO method regularizes 
 Next we chose a random forest--describe how a random forest performs feature selection. 
 
 \section{Preliminary Results}
-The network statistics with the most influence on the evolutionary time of each species for the LASSO model were the number of triangles, clique count, LCSG clique count, node count, LCSG node count, LCSG Degree Max, and number of 1-stars (number of nodes). Explain what lcsg degree max and clique count is. 
+The network statistics with the most influence on the evolutionary time of each species for the LASSO model were the number of triangles, clique count, LCSG clique count, node count, LCSG node count, LCSG Degree Max, and number of 1-stars (number of nodes). 
 LASSO efficiency info: error was 0.05
 
-The random forest model was consistent with the results from above but also included modularity, LCSG clique-size mean (explain what this is and how it describes network stability), GiantProportion (same here), a variety of k-star counts, and more. 
+The random forest model was consistent with the results from above but also included modularity, LCSG clique-size mean, GiantProportion, a variety of k-star counts, and more. 
 Random forest efficiency info
 
 Can we make a nice plot of the common/uncommon statistics found to be important?
@@ -140,8 +160,8 @@ Below is pseudocode for how we constructed the data frame of stars counts for ea
 \begin{algorithm}
 \caption{Get Stars Algorithm}\label{alg:cap}
 \begin{algorithmic}
-\State $\text{giantC } \gets \text{ giant component for undirected network}$
-\State $\text{A } \gets \text{ convert giantC to adjacency matrix}$
+\State $\text{LCSG } \gets \text{ giant component for undirected network}$
+\State $\text{A } \gets \text{ convert LCSG to adjacency matrix}$
 \State $\text{d } \gets \text{ sum row elements of A}$
 \State $\text{values, counts } \gets \text{ find unique elements and counts for each}$
 \State $\text{stars } \gets \text{ pandas DataFrame of counts with index names being values}$
