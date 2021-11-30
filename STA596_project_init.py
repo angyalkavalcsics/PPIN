@@ -18,7 +18,7 @@ from sklearn import linear_model
 from sklearn import ensemble
 ###############################################################################
 # Read in file
-unpickled_df = pd.read_pickle("yourpath/species_data.output.pickle")
+unpickled_df = pd.read_pickle("C:/Users/angya/OneDrive/Documents/species_data.output.pickle")
 ###############################################################################
 # Take a subset of the data 
 bact_prot = unpickled_df.loc[unpickled_df["Taxonomy Level 2"] == "Bacteria_Proteobacteria"]
@@ -27,7 +27,7 @@ adj_train = reduced_df.iloc[:, 8]
 ###############################################################################
 # Author: Angyalka
 # Plot PPIN
-n = 31 # controls which species we plot
+n = 35 # controls which species we plot
 first = adj_train.iloc[n].todense()
 G = nx.convert_matrix.from_numpy_matrix(first) 
 # need to fix the networks so we only take the 
@@ -227,7 +227,19 @@ y_test = test_df['Evolution']
 lasso = linear_model.Lasso(alpha = 0.6, max_iter = 10000)
 mod = lasso.fit(X,y)
 coefs = pd.DataFrame(mod.coef_, index = X.columns, columns= ['coefs'])
-coefs.index[np.nonzero(np.array(coefs))[0]]
+lasso_feature = coefs.index[np.nonzero(np.array(coefs))[0]]
+lasso_coefs = coefs.iloc[np.nonzero(np.array(coefs))[0]]
+
+# LASSO feature importance plot
+
+fig, ax = pyplot.subplots(figsize=(12, 7.5))
+pyplot.rcParams['font.size'] = '12'
+ax.barh(list(lasso_feature), list(lasso_coefs.iloc[:,0]))
+pyplot.xlabel('Coefficient')
+pyplot.ylabel('Feature')
+ax.set_title('LASSO Feature Importance', fontsize=16)
+pyplot.show()
+
 
 '''
 Index(['Number of Triangles', 'Clique Count', 'LCSG Clique Count',
@@ -251,41 +263,49 @@ feature_importances = np.mean([
     tree.feature_importances_ for tree in m.estimators_
 ], axis=0)
 
+reduced_feat_importance = []
+feature_names = []
 for i in np.argsort(feature_importances)[::-1]:
     if feature_importances[i] < 0.01:
         break
+    feature_names.append(X.columns[i])
+    reduced_feat_importance.append(feature_importances[i])
     print(f'\t{X.columns[i]}: {feature_importances[i]:.3f}')
     
 '''	
-	num_1stars: 0.119
-	Modularity: 0.106
-	num_6stars: 0.091
-	Clique Count: 0.063
-	LCSG Clique-Size Mean: 0.044
-	num_59stars: 0.044
-	num_31stars: 0.034
-	Average Centrality: 0.029
-	num_15stars: 0.026
-	num_14stars: 0.025
-	GiantProportion: 0.024
-	LCSG Clique-Size Max: 0.020
-	num_2stars: 0.018
-	num_18stars: 0.017
-	num_3stars: 0.016
-	num_7stars: 0.016
+	num_1stars: 0.116
+	Modularity: 0.111
+	Clique Count: 0.083
+	num_6stars: 0.079
+	num_59stars: 0.060
+	Average Centrality: 0.034
+	num_15stars: 0.029
+	num_3stars: 0.027
+	LCSG Clique-Size Mean: 0.026
+	num_21stars: 0.024
+	GiantProportion: 0.023
+	num_60stars: 0.022
+	LCSG Clique-Size Max: 0.019
+	LCSG Clique Count: 0.018
+	num_7stars: 0.018
+	LCSG Node Count: 0.017
+	num_51stars: 0.015
 	Clique-Size Max: 0.015
-	num_12stars: 0.015
-	LCSG Clique Count: 0.015
-	num_21stars: 0.014
 	LCSG Degree Max: 0.014
-	Number of Triangles: 0.011
-	num_51stars: 0.011
-	Clique-Size Mean: 0.011
-	num_4stars: 0.011
-	num_27stars: 0.011
-	LCSG Node Count: 0.010
-	num_13stars: 0.010
+	Number of Triangles: 0.013
+	num_56stars: 0.013
+	LCSG Degree Mean: 0.012
+	num_24stars: 0.011
+	num_2stars: 0.011
 '''
+# Feature Importance plot
+fig, ax = pyplot.subplots(figsize=(12, 7.5))
+pyplot.rcParams['font.size'] = '12'
+ax.barh(feature_names, reduced_feat_importance)
+pyplot.xlabel('Importance')
+pyplot.ylabel('Feature')
+ax.set_title('Random Forest Feature Importance', fontsize=16)
+pyplot.show()
 
 # Find training error
 
@@ -314,3 +334,16 @@ print(df1_vis.to_latex(index=True))
 
 df2_vis = np.round(df2.head().T.iloc[:6,:], 3)
 print(df2_vis.to_latex(index=True)) 
+
+
+
+
+
+
+
+
+
+
+
+
+
