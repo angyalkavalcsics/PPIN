@@ -143,11 +143,14 @@ We explained before how modularity and average degree centrality influence the t
 There are many possible confounders which should be considered along with our preliminary results: investigative biases towards modeling common or popular organisms, network size, and genome size. It seems that the network statistics we have found so far and entered into the models do a fair job of describing topological stability. Moreover, many of these statistics do have a significant relationship to evolutionary time of a species. In the next few weeks, we plan to fine-tune the hyperparameters of the models. For example we intend to add cross validation to the LASSO model and use the \textit{RandomizedSearchCV} function to find optimal parameters for the Random Forest model. Additionally, we are implementing a function which will remove a fraction of edges from each network then calculate how many removals it takes for the network to have less than 10 percent of nodes in its largest connected component. 
 \section{Appendix}
 \subsection{Exhaustive Enumeration of Cliques is Memory-bound}
-\begin{wrapfigure}{r}[0pt]{0pt}
-\centering
-  \includegraphics[width=0.4\linewidth]{workers}
+\begin{wrapfigure}{r}{0.5\textwidth}
+  \vspace{-20pt}
+  \begin{center}
+    \includegraphics[width=0.48\textwidth]{workers}
+  \end{center}
+  \vspace{-20pt}
   \caption{$Worker$ memory usage}
-  \label{fig:workers}
+  \vspace{-10pt}
 \end{wrapfigure}
 We tried implementing exhaustive enumeration of \textit{all} cliques (as opposed to \textit{maximal} cliques) but found this to be impractical, as the supporting NetworkX algorithm (\textit{enumerate\_all\_cliques}) is memory-bound. We tested this limitation via execution with 64GB of RAM and 3 $Worker$ processes; execution failed with a $MemoryError$ after $\sim8$ hours of processing, when one of a workers attempted to allocate additional memory beyond available capacity (see Figure 2).
 \subsection{K-Stars Algorithm}
