@@ -16,13 +16,17 @@ from networkx.algorithms.flow import shortest_augmenting_path
 import statsmodels.api as sm
 from sklearn import linear_model
 from sklearn import ensemble
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Lasso, LassoCV
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import scale 
 ###############################################################################
 # Read in file
 unpickled_df = pd.read_pickle("C:/Users/angya/OneDrive/Documents/species_data.output.pickle")
 ###############################################################################
 # Take a subset of the data 
 bact_prot = unpickled_df.loc[unpickled_df["Taxonomy Level 2"] == "Bacteria_Proteobacteria"]
-reduced_df = bact_prot.iloc[:75, :]
+reduced_df = bact_prot.iloc[:100, :]
 adj_train = reduced_df.iloc[:, 8]
 ###############################################################################
 # Author: Angyalka
@@ -224,12 +228,49 @@ y_test = test_df['Evolution']
 # Fit LASSO
 # Lasso fits an intercept by default
 # Author: Angyalka
-lasso = linear_model.Lasso(alpha = 0.6, max_iter = 10000)
-mod = lasso.fit(X,y)
-coefs = pd.DataFrame(mod.coef_, index = X.columns, columns= ['coefs'])
-lasso_feature = coefs.index[np.nonzero(np.array(coefs))[0]]
-lasso_coefs = coefs.iloc[np.nonzero(np.array(coefs))[0]]
+# perform cv to find alpha
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
 
+alp = 10**np.linspace(1,-3,100)*0.5
+np.min(alp)
+np.max(alp)
+lasso = Lasso(max_iter = 10000, normalize = True)
+coefs = []
+
+for a in alp:
+    lasso.set_params(alpha=a)
+    lasso.fit(scale(X_train), y_train)
+    coefs.append(lasso.coef_)
+    
+ax = pyplot.gca()
+ax.plot(alp*2, coefs)
+ax.set_xscale('log')
+pyplot.axis('tight')
+pyplot.xlabel('alpha')
+pyplot.ylabel('weights')
+ax.set_title('LASSO Coefficients as a Function of Regularization', fontsize=16)
+
+lassocv = LassoCV(alphas = None, cv = 10, max_iter = 1000000, normalize = True)
+lassocv.fit(X_train, y_train)
+lassocv.alphas_
+lassocv.alpha_  # .0535
+lasso.set_params(alpha=lassocv.alpha_)
+
+lasso.fit(X_train, y_train)
+mean_squared_error(y_test, lasso.predict(X_test)) # 0.054
+mean_squared_error(y_train, lasso.predict(X_train)) # 0.0487
+
+c = pd.DataFrame(lasso.coef_, index = X.columns, columns= ['coefs'])
+lasso_feature = c.index[np.nonzero(np.array(c))[0]]
+lasso_coefs = c.iloc[np.nonzero(np.array(c))[0]]
+lasso_feature
+
+# This returned some strange results
+'''
+Index(['Average Centrality', 'num_56stars', 'num_59stars', 'num_60stars',
+       'num_79stars'],
+      dtype='object')
+'''
 # LASSO feature importance plot
 
 fig, ax = pyplot.subplots(figsize=(12, 7.5))
@@ -239,19 +280,6 @@ pyplot.xlabel('Coefficient')
 pyplot.ylabel('Feature')
 ax.set_title('LASSO Feature Importance', fontsize=16)
 pyplot.show()
-
-
-'''
-Index(['Number of Triangles', 'Clique Count', 'LCSG Clique Count',
-       'LCSG Node Count', 'LCSG Degree Max', 'num_1stars'],
-      dtype='object')
-'''
-
-# Find training error
-
-yhat = mod.predict(X)
-np.mean((y - yhat)**2) # 0.05
-
 ###############################################################################
 # Fit a tree
 # Author: Angyalka
@@ -334,16 +362,3 @@ print(df1_vis.to_latex(index=True))
 
 df2_vis = np.round(df2.head().T.iloc[:6,:], 3)
 print(df2_vis.to_latex(index=True)) 
-
-
-
-
-
-
-
-
-
-
-
-
-
