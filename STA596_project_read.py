@@ -27,8 +27,10 @@ X, y, merged = load_data()
 
 # ---- pair plot
 compare = [
+    'Evolution',
     'modularity',
-    'mc_mean',
-    'giant_prop',
+    'largest_clique',
+    # 'proportion_in_giant',
+    'critical_threshold',
     ]
-sns.pairplot(X[compare], kind="reg", diag_kind="kde")
+sns.pairplot(merged[compare], kind="reg", diag_kind="kde")

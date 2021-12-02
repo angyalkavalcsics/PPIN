@@ -4,6 +4,9 @@
 """
 
 import os
+import sys
+import copy
+import random
 import pandas as pd
 import numpy as np
 import networkx as nx
@@ -15,12 +18,15 @@ import multiprocessing as mp
 import queue
 import tqdm
 from memory_profiler import profile
+import time
+from datetime import datetime
+
 
 
 # Cliques
 
 @profile
-def get_clique_count_df(G,as_df=False,maximal=False):
+def get_clique_count_df(G,as_df=True,maximal=True):
     clique_counts = Counter()
     for clique in nx.find_cliques(G) if maximal else nx.enumerate_all_cliques(G):
         clique_counts[len(clique)] += 1
@@ -44,6 +50,107 @@ def get_degree_hist(G,as_df=False):
         return degree_df
     else:
         return degree
+
+def getstars(G):
+    A = nx.adjacency_matrix(G).todense()
+    deg = np.asarray(np.sum(A,axis=0)).flatten()
+    values, counts = np.unique(deg, return_counts=True)
+    stars_sm = pd.DataFrame(counts)
+    stars_sm = stars_sm.set_index(values)
+    return(stars_sm)
+
+# Critical Threshold
+
+def modifiable_lcsg(G):
+    return nx.Graph(G.subgraph(max(nx.connected_components(G), key=len)))
+
+def simulate_failure(init_G,max_rm=1,min_lcsg=.1,num_iter=10):
+    min_rm = sys.maxsize
+    max_rm = -sys.maxsize
+    total_rm = 0
+    for curr_iter in range(num_iter):
+        G = nx.Graph(init_G)
+        rm_count = 0
+        while True:
+            curr_rm = random.randint(1,max_rm) if max_rm > 1 else 1
+            rm_count += curr_rm
+            if G.number_of_nodes() <= curr_rm:
+                break # we've removed all nodes
+            G.remove_nodes_from(random.choices(list(G),k=curr_rm))
+            max_conn = max(nx.connected_components(G), key=len, default=set())
+            if len(max_conn)/G.number_of_nodes() < min_lcsg:
+                break # network failure
+        total_rm += rm_count
+        min_rm = min(min_rm,rm_count)
+        max_rm = max(max_rm,rm_count)
+    return min_rm, total_rm/num_iter, max_rm
+
+
+# Overall calculation
+
+def calculate(G,graph_cases,row={}):
+    for (prefix, graph) in graph_cases:
+        # ---- centrality
+        centrality = nx.degree_centrality(graph)
+        centrality_df = pd.DataFrame.from_dict(centrality, orient='index')
+        row[f'{prefix}avg_centrality'] = np.mean(centrality_df.iloc[:, 0])
+        
+        
+        # ---- triangles
+        triangles = nx.triangles(graph)
+        row[f'{prefix}avg_triangles'] = np.mean(list(triangles.values()))
+        
+        
+        # ---- modularity and connectivity
+        row[f'{prefix}modularity'] = nx_comm.modularity(graph, nx_comm.label_propagation_communities(graph))
+        row[f'{prefix}connectivity'] = nx.node_connectivity(graph, flow_func=shortest_augmenting_path)
+        
+        
+        # ---- density
+        n = graph.number_of_nodes()
+        e = graph.number_of_edges()
+        density = 2*e/(n*(n-1))
+        row[f'{prefix}nodes'] = n
+        row[f'{prefix}edges'] = e
+        row[f'{prefix}density'] = density
+        
+        
+        # ---- clique stats
+        maximal_clique_counts = Counter()
+        for clique in nx.find_cliques(graph):
+            maximal_clique_counts[len(clique)] += 1
+        maximal_clique_df = pd.DataFrame.from_dict(maximal_clique_counts,orient='index').reset_index()
+        maximal_clique_df.columns = ['clique_size', 'count']
+        maximal_clique_stats = HistStats(maximal_clique_df,'clique_size')
+        row[f'{prefix}clique_count'] = maximal_clique_stats.count
+        row[f'{prefix}largest_clique'] = maximal_clique_stats.max
+        row[f'{prefix}clique_mode'] = maximal_clique_stats.mode
+        row[f'{prefix}avg_clique'] = maximal_clique_stats.mean
+        
+        # #      exhaustive clique counts
+        if graph is G:
+            row.update({f'mc_{k}': v for k, v in maximal_clique_counts.items()})
+    
+    
+        # ---- degree stats (equivalent to getstars)
+        degree_hist = nx.degree_histogram(graph)
+        degree_df = pd.DataFrame(degree_hist).reset_index()
+        degree_df.columns = ['degree', 'count']
+        degree_stats = HistStats(degree_df,'degree')
+        row[f'{prefix}max_degree'] = degree_stats.max
+        row[f'{prefix}degree_mode'] = degree_stats.mode
+        row[f'{prefix}avg_degree'] = degree_stats.mean
+        
+        # #      exhaustive degree counts
+        if graph is G:
+            row.update({f'd_{k}': v for k, v in enumerate(degree_hist)})
+    
+    
+        # ---- failure via node removal
+        min_rm, max_rm, mean_rm = simulate_failure(graph)
+        row[f'{prefix}min_critical'] = min_rm
+        row[f'{prefix}max_critical'] = max_rm
+        row[f'{prefix}avg_critical'] = mean_rm
 
 # classes
 
@@ -69,19 +176,16 @@ class Producer(mp.Process):
     
     @profile
     def run(self):
-        try:
-            for i in range(self.df.shape[0]):
-                while True:
-                    try:
-                        self.df_queue.put_nowait(self.df.iloc[[i]])
-                        break
-                    except queue.Full:
-                        sleep(.5)
-            for i in range(self.num_workers):
-                self.df_queue.put(None)
-        except KeyboardInterrupt:
-            pass
-    
+        for i in range(self.df.shape[0]):
+            while True:
+                try:
+                    self.df_queue.put_nowait(self.df.iloc[[i]])
+                    break
+                except queue.Full:
+                    sleep(.5)
+        for i in range(self.num_workers):
+            self.df_queue.put(None)
+
 class Worker(mp.Process):
     def __init__(self, df_queue, row_queue):
         super().__init__()
@@ -91,90 +195,51 @@ class Worker(mp.Process):
 
     @profile
     def run(self):
-        try:
-            while True:
-                try:
-                    df = self.df_queue.get_nowait()
-                    if df is None:
-                        self.row_queue.put(None)
+        pid = os.getpid()
+        while True:
+            try:
+                df = self.df_queue.get_nowait()
+                if df is None:
+                    self.row_queue.put(None)
+                    break
+                                
+                # build row
+                row = {}
+                row['Species_ID'] = df['Species_ID'].iloc[0]
+                
+                start = time.time()
+                
+                # determine giant component
+                ppin = df['Matrix'].iloc[0]
+                G = nx.convert_matrix.from_numpy_matrix(ppin.todense())
+                lcsg = G.subgraph(max(nx.connected_components(G), key=len))
+                graph_cases = [('',G),('lcsg_',lcsg)]
+                
+                
+                calculate(G,graph_cases,row)
+                
+                
+                # pet stat
+                row['proportion_in_giant'] = lcsg.number_of_nodes()/G.number_of_nodes()
+                
+                
+                # measure performance
+                row['processing_time'] = time.time() - start
+                
+                
+                # end timestamp
+                # row['end_timestamp'] = datetime.now().strftime("%H:%M:%S")
+                
+                
+                # push DataFrame to queue
+                while True:
+                    try:
+                        self.row_queue.put_nowait(row)
                         break
-                    
-                    # build row
-                    row = {}
-                    row['Species_ID'] = df['Species_ID'].iloc[0]
-                    
-                    # derive largest connected subgraph
-                    ppin = df['Matrix'].iloc[0]
-                    G = nx.convert_matrix.from_numpy_matrix(ppin.todense())
-                    lcsg = G.subgraph(max(nx.connected_components(G), key=len))
-                    
-                    # centrality
-                    centrality = nx.degree_centrality(lcsg)
-                    centrality_df = pd.DataFrame.from_dict(centrality, orient='index')
-                    row['avg_centrality'] = np.mean(centrality_df.iloc[:, 0])
-                    
-                    # triangles
-                    triangles = nx.triangles(lcsg)
-                    row['avg_triangles'] = np.mean(list(triangles.values()))
-                    
-                    # modularity and connectivity
-                    row['modularity'] = nx_comm.modularity(
-                        lcsg,
-                        nx_comm.label_propagation_communities(lcsg))
-                    # row['connectivity'] = nx.node_connectivity(lcsg, flow_func=shortest_augmenting_path)
-                
-                
-                    # ---- clique stats
-                    maximal_clique_counts = Counter()
-                    for clique in nx.find_cliques(lcsg):
-                        maximal_clique_counts[len(clique)] += 1
-                    
-                    maximal_df = pd.DataFrame.from_dict(maximal_clique_counts,orient='index').reset_index()
-                    maximal_df.columns = ['clique_size', 'count']
-                    maximal_stats = HistStats(maximal_df,'clique_size')
-                    row['mc_count'] = maximal_stats.count
-                    row['mc_max'] = maximal_stats.max
-                    row['mc_mode'] = maximal_stats.mode
-                    row['mc_mean'] = maximal_stats.mean
-                    row.update({f'mc_{k}': v for k, v in maximal_clique_counts.items()})
-                    
-                    
-                    # ---- exhaustive clique counts
-                    # clique_counts = Counter()
-                    # for clique in nx.enumerate_all_cliques(lcsg):
-                    #     clique_counts[len(clique)] += 1
-                    # row.update({f'c_{k}': v for k, v in clique_counts.items()})
-                    # row.update({f'c_{k}': v for k, v in get_clique_count_df(lcsg).items()})
-                    
-                    
-                    # ---- degree stats
-                    degree_hist = nx.degree_histogram(lcsg)
-                    degree_df = pd.DataFrame(degree_hist).reset_index()
-                    degree_df.columns = ['degree', 'count']
-                    degree_stats = HistStats(degree_df,'degree')
-                    row['d_max'] = degree_stats.max
-                    row['d_mode'] = degree_stats.mode
-                    row['d_mean'] = degree_stats.mean
-                    
-                    # exhaustive degree counts
-                    row.update({f'd_{k}': v for k, v in enumerate(degree_hist)})
-                    # row.update({f'Node Degree {k}': v for k, v in enumerate(get_degree_hist(lcsg))})
-                        
-                    
-                    # pet stat
-                    row['giant_prop'] = lcsg.number_of_nodes()/G.number_of_nodes()
-                    
-                    # push DataFrame to queue
-                    while True:
-                        try:
-                            self.row_queue.put_nowait(row)
-                            break
-                        except queue.Full:
-                            sleep(.5)
-                except queue.Empty:
-                    sleep(.5)
-        except KeyboardInterrupt:
-            pass
+                    except queue.Full:
+                        sleep(.5)
+            except queue.Empty:
+                sleep(.5)
 
 class Consumer(mp.Process):
     def __init__(self, num_workers, row_queue, result_queue):
@@ -184,23 +249,20 @@ class Consumer(mp.Process):
         self.row_queue = row_queue
         self.result_queue = result_queue
         self.df = pd.DataFrame()
-
+    
     @profile
     def run(self):
-        try:
-            remaining_workers = self.num_workers
-            while True:
-                try:
-                    row = self.row_queue.get_nowait()
-                    if row is None:
-                        remaining_workers -= 1
-                        if remaining_workers == 0:
-                            self.result_queue.put(None)
-                            break
-                    else:
-                        self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
-                        self.result_queue.put(self.df)
-                except queue.Empty:
-                    sleep(.5)
-        except KeyboardInterrupt:
-            pass
+        remaining_workers = self.num_workers
+        while True:
+            try:
+                row = self.row_queue.get_nowait()
+                if row is None:
+                    remaining_workers -= 1
+                    if remaining_workers == 0:
+                        self.result_queue.put(None)
+                        break
+                else:
+                    self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
+                    self.result_queue.put(self.df)
+            except queue.Empty:
+                sleep(.5)
