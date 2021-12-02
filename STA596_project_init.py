@@ -14,9 +14,8 @@ import matplotlib.pyplot as pyplot
 import networkx.algorithms.community as nx_comm
 from networkx.algorithms.flow import shortest_augmenting_path
 import statsmodels.api as sm
-from sklearn import linear_model
-from sklearn import ensemble
-from sklearn.model_selection import train_test_split
+from sklearn import linear_model, ensemble
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import scale 
@@ -188,47 +187,10 @@ another way to measure connectivity/resiliency of the proteome.
 
 X['GiantProportion'] = X['LCSG Node Count']/X['num_1stars']
 
-
 ###############################################################################
-# Create test data
+# Fit LASSO and perform cv to find alpha
 # Author: Angyalka
-'''
-# We can't find test error because the number of k-stars would be different
 
-test_df = bact_prot.iloc[76:100, :]
-adj_test = test_df.iloc[:, 8]
-
-predictors_test = get_df1(adj_test)
-df1_test = pd.DataFrame(predictors_test, index = test_df['Species_ID'], columns=[
-    'Average Centrality',
-    'Number of Triangles',
-    'Modularity',
-    'Clique Count',
-    'Clique-Size Max',
-    'Clique-Size Mode',
-    'Clique-Size Mean',
-    'LCSG Clique Count',
-    'LCSG Clique-Size Max',
-    'LCSG Clique-Size Mode',
-    'LCSG Clique-Size Mean',
-    'LCSG Node Count',
-    'LCSG Degree Max',
-    'LCSG Degree Mode',
-    'LCSG Degree Mean',
-    ])
-
-df2_test = get_df2(adj_test)
-df2_test.index = test_df['Species_ID']
-
-X_test = pd.concat([df1_test, df2_test], axis=1)
-X_test['GiantProportion'] = X_test['LCSG Node Count']/X_test['Node Count']
-y_test = test_df['Evolution']
-'''
-###############################################################################
-# Fit LASSO
-# Lasso fits an intercept by default
-# Author: Angyalka
-# perform cv to find alpha
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
 
 alp = 10**np.linspace(1,-3,100)*0.5
@@ -257,8 +219,11 @@ lassocv.alpha_  # .0535
 lasso.set_params(alpha=lassocv.alpha_)
 
 lasso.fit(X_train, y_train)
-mean_squared_error(y_test, lasso.predict(X_test)) # 0.054
-mean_squared_error(y_train, lasso.predict(X_train)) # 0.0487
+train_pred_y = lasso.predict(X_train) 
+test_pred_y = lasso.predict(X_test) 
+    
+print(f"train_MSE = {mean_squared_error(y_train, train_pred_y)}") # 0.0487
+print(f"test_MSE = {mean_squared_error(y_test, test_pred_y)}") # 0.054
 
 c = pd.DataFrame(lasso.coef_, index = X.columns, columns= ['coefs'])
 lasso_feature = c.index[np.nonzero(np.array(c))[0]]
@@ -281,14 +246,46 @@ pyplot.ylabel('Feature')
 ax.set_title('LASSO Feature Importance', fontsize=16)
 pyplot.show()
 ###############################################################################
-# Fit a tree
+# Fit and tune a random forest regressor tree
 # Author: Angyalka
-m = ensemble.RandomForestRegressor(max_depth=4)
-m.fit(X,y)
+bag_forest_reg = ensemble.RandomForestRegressor(criterion="mse",
+                                       n_jobs=-1,
+                                       random_state=1)
+
+bag_forest_reg.fit(X_train, y_train)
+
+train_pred_y = bag_forest_reg.predict(X_train)
+test_pred_y = bag_forest_reg.predict(X_test)
+
+print(f"train_MSE = {mean_squared_error(y_train, train_pred_y)}") # 0.0055
+print(f"test_MSE = {mean_squared_error(y_test, test_pred_y)}") # 0.0288
+
+param_grid = {
+    "n_estimators":[100,200,300],
+    "max_depth":[10, 20, 30, 40, 50],
+    "max_features":[6,8,10,12,14,16, 18, 20, 25, 30]
+}
+
+rf_reg = ensemble.RandomForestRegressor()
+
+rf_reg_tuned = GridSearchCV(estimator=rf_reg,
+                            param_grid=param_grid,
+                            cv=10,
+                            n_jobs=-1,
+                            verbose=2)
+
+rf_reg_tuned.fit(X_train, y_train)
+rf_reg_best = rf_reg_tuned.best_estimator_
+
+train_pred_y = rf_reg_best.predict(X_train)
+test_pred_y = rf_reg_best.predict(X_test)
+
+print(f"train_MSE = {mean_squared_error(y_train, train_pred_y)}") # 0.00527
+print(f"test_MSE = {mean_squared_error(y_test, test_pred_y)}") # 0.031
 
 # Find significant predictors
 feature_importances = np.mean([
-    tree.feature_importances_ for tree in m.estimators_
+    tree.feature_importances_ for tree in rf_reg_best.estimators_
 ], axis=0)
 
 reduced_feat_importance = []
@@ -301,30 +298,43 @@ for i in np.argsort(feature_importances)[::-1]:
     print(f'\t{X.columns[i]}: {feature_importances[i]:.3f}')
     
 '''	
-	num_1stars: 0.116
-	Modularity: 0.111
-	Clique Count: 0.083
-	num_6stars: 0.079
-	num_59stars: 0.060
-	Average Centrality: 0.034
-	num_15stars: 0.029
-	num_3stars: 0.027
-	LCSG Clique-Size Mean: 0.026
-	num_21stars: 0.024
-	GiantProportion: 0.023
-	num_60stars: 0.022
-	LCSG Clique-Size Max: 0.019
-	LCSG Clique Count: 0.018
+	Modularity: 0.057
+	Clique Count: 0.044
+	num_3stars: 0.043
+	LCSG Clique-Size Mean: 0.038
+	num_6stars: 0.038
+	LCSG Clique Count: 0.035
+	Average Centrality: 0.033
+	num_1stars: 0.029
+	Clique-Size Mean: 0.027
+	Number of Triangles: 0.027
+	num_5stars: 0.027
+	num_2stars: 0.026
+	LCSG Node Count: 0.026
+	LCSG Clique-Size Max: 0.024
+	LCSG Degree Mean: 0.024
+	num_21stars: 0.020
+	Clique-Size Max: 0.020
+	num_13stars: 0.019
+	num_12stars: 0.019
 	num_7stars: 0.018
-	LCSG Node Count: 0.017
-	num_51stars: 0.015
-	Clique-Size Max: 0.015
-	LCSG Degree Max: 0.014
-	Number of Triangles: 0.013
-	num_56stars: 0.013
-	LCSG Degree Mean: 0.012
-	num_24stars: 0.011
-	num_2stars: 0.011
+	num_15stars: 0.017
+	num_17stars: 0.017
+	num_11stars: 0.016
+	num_9stars: 0.016
+	num_27stars: 0.015
+	num_25stars: 0.015
+	num_10stars: 0.015
+	num_8stars: 0.014
+	num_4stars: 0.013
+	num_16stars: 0.013
+	num_22stars: 0.012
+	num_52stars: 0.012
+	LCSG Degree Max: 0.011
+	num_14stars: 0.011
+	LCSG Degree Mode: 0.011
+	num_20stars: 0.011
+	num_31stars: 0.011
 '''
 # Feature Importance plot
 fig, ax = pyplot.subplots(figsize=(12, 7.5))
@@ -334,12 +344,6 @@ pyplot.xlabel('Importance')
 pyplot.ylabel('Feature')
 ax.set_title('Random Forest Feature Importance', fontsize=16)
 pyplot.show()
-
-# Find training error
-
-yhat = m.predict(X)
-np.mean((y - yhat)**2) # 0.009
-
 ###############################################################################
 # Pairs plot to show relationship between the common significant 
 # predictors from both models
@@ -353,7 +357,6 @@ compare = {
 
 pp = sns.pairplot(X[compare], kind="reg", diag_kind="kde")
 pp.fig.suptitle("Pairwise Relationships", y=1.00)
-
 ###############################################################################
 # df visualizations 
 # Author: Angyalka
