@@ -89,7 +89,10 @@ def calculate(
             if X is None:
                 break
             else:
-                pickle.dump(pd.concat([prior_X,X]), open(out_path, 'wb'))
+                pickle.dump(
+                    pd.concat([prior_X,X]).set_index('Species_ID'),
+                    open(out_path, 'wb')
+                )
                 if not progress.update():
                     progress.refresh()
         except queue.Empty:
@@ -104,7 +107,8 @@ def calculate(
 
 @profile
 def main():
-    src_df = pd.read_pickle(f'{data_path}species_data.output.pickle')
+    src_df = pd.read_pickle(f'{data_path}/species_data.output.pickle')
+    src_df = src_df.set_index('Species_ID')
     
     
     # ---- spot-calculate single subset

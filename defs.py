@@ -25,7 +25,7 @@ from datetime import datetime
 
 # Cliques
 
-@profile
+# @profile
 def get_clique_count_df(G,as_df=True,maximal=True):
     clique_counts = Counter()
     for clique in nx.find_cliques(G) if maximal else nx.enumerate_all_cliques(G):
@@ -41,7 +41,7 @@ def get_clique_count_df(G,as_df=True,maximal=True):
 
 # Degree
 
-@profile
+# @profile
 def get_degree_hist(G,as_df=False):
     degree = nx.degree_histogram(G)
     if as_df:
@@ -64,26 +64,52 @@ def getstars(G):
 def modifiable_lcsg(G):
     return nx.Graph(G.subgraph(max(nx.connected_components(G), key=len)))
 
-def simulate_failure(init_G,max_rm=1,min_lcsg=.1,num_iter=10):
+def remove_edges(G,n=1):
+    if G.number_of_edges() <= n:
+        return False
+    G.remove_edges_from(random.choices(list(G.edges()),k=n))
+    return True
+
+def remove_nodes(G,n=1):
+    if G.number_of_nodes() <= n:
+        return False
+    G.remove_nodes_from(random.choices(list(G),k=n))
+    return True
+
+def simulate_failure(
+        init_G,
+        max_rm=1,
+        min_lcsg=.1,
+        num_iter=10,
+        use_edges=False,
+        ):
     min_rm = sys.maxsize
     max_rm = -sys.maxsize
     total_rm = 0
+    remove = remove_edges if use_edges else remove_nodes
     for curr_iter in range(num_iter):
         G = nx.Graph(init_G)
         rm_count = 0
         while True:
             curr_rm = random.randint(1,max_rm) if max_rm > 1 else 1
             rm_count += curr_rm
-            if G.number_of_nodes() <= curr_rm:
-                break # we've removed all nodes
-            G.remove_nodes_from(random.choices(list(G),k=curr_rm))
+            
+            # destroy!
+            if not remove(G,curr_rm):
+                break # can't remove any more!
+            
+            # remove chaff
+            chaff = [node for node,degree in dict(G.degree()).items() if degree == 0]
+            rm_count += len(chaff)
+            G.remove_nodes_from(chaff)
+            
             max_conn = max(nx.connected_components(G), key=len, default=set())
             if len(max_conn)/G.number_of_nodes() < min_lcsg:
                 break # network failure
         total_rm += rm_count
         min_rm = min(min_rm,rm_count)
         max_rm = max(max_rm,rm_count)
-    return min_rm, total_rm/num_iter, max_rm
+    return min_rm, max_rm, total_rm/num_iter
 
 
 # Overall calculation
@@ -128,8 +154,8 @@ def calculate(G,graph_cases,row={}):
         row[f'{prefix}avg_clique'] = maximal_clique_stats.mean
         
         # #      exhaustive clique counts
-        if graph is G:
-            row.update({f'mc_{k}': v for k, v in maximal_clique_counts.items()})
+        # if graph is G:
+        #     row.update({f'mc_{k}': v for k, v in maximal_clique_counts.items()})
     
     
         # ---- degree stats (equivalent to getstars)
@@ -142,12 +168,18 @@ def calculate(G,graph_cases,row={}):
         row[f'{prefix}avg_degree'] = degree_stats.mean
         
         # #      exhaustive degree counts
-        if graph is G:
-            row.update({f'd_{k}': v for k, v in enumerate(degree_hist)})
+        # if graph is G:
+        #     row.update({f'd_{k}': v for k, v in enumerate(degree_hist)})
     
     
         # ---- failure via node removal
         min_rm, max_rm, mean_rm = simulate_failure(graph)
+        row[f'{prefix}min_critical'] = min_rm
+        row[f'{prefix}max_critical'] = max_rm
+        row[f'{prefix}avg_critical'] = mean_rm
+        
+        # ---- failure via edge removal
+        min_rm, max_rm, mean_rm = simulate_failure(graph,use_edges=True)
         row[f'{prefix}min_critical'] = min_rm
         row[f'{prefix}max_critical'] = max_rm
         row[f'{prefix}avg_critical'] = mean_rm
@@ -174,7 +206,7 @@ class Producer(mp.Process):
         self.num_workers = num_workers
         self.df_queue = df_queue
     
-    @profile
+    # @profile
     def run(self):
         for i in range(self.df.shape[0]):
             while True:
@@ -193,7 +225,7 @@ class Worker(mp.Process):
         self.df_queue = df_queue
         self.row_queue = row_queue
 
-    @profile
+    # @profile
     def run(self):
         pid = os.getpid()
         while True:
@@ -205,7 +237,7 @@ class Worker(mp.Process):
                                 
                 # build row
                 row = {}
-                row['Species_ID'] = df['Species_ID'].iloc[0]
+                row['Species_ID'] = df.index[0]
                 
                 start = time.time()
                 
@@ -250,7 +282,7 @@ class Consumer(mp.Process):
         self.result_queue = result_queue
         self.df = pd.DataFrame()
     
-    @profile
+    # @profile
     def run(self):
         remaining_workers = self.num_workers
         while True:
