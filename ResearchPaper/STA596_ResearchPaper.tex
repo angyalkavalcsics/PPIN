@@ -81,7 +81,7 @@ Understanding how protein interactomes evolve and developing methods for analyzi
 \subsection{Acquisition of Data}
 Our dataset comes from the Stanford Network Analysis Platform (or SNAP). This data was collected using the Search Tool for the Retrieval of Interacting Genes/Proteins (or STRING), from the European Molecular Biology Laboratory, EMBL and is organized in multiple text files, joined by species ID. It comprises taxonomy information, an edge set for each interactome, and a numerical variable for evolutionary time of the species.
 
-\begin{wrapfigure}{r}[0pt]{0pt}
+\begin{wrapfigure}{l}[0pt]{0pt}
 \centering
   \includegraphics[width=.5\linewidth]{PPIN_fig1}
   \caption{An example PPIN}
@@ -106,26 +106,33 @@ Cliques are fully connected subgraphs, meaning each node in a clique is directly
 
 \textbf{GiantProportion} is a simple metric that seems to bring unique information into the model. It is the ratio of nodes in the complete graph that are also members of the LCSG, this is \textit{LCSG Node Count} divided by \textit{Total Node Count}.
 
-Next, we wrote a function which would find the \textbf{number of k-stars} in each PPIN from one to the maximum size star in the network. For example, a 1-star is a node in the network with one degree, a 2-star is a node in the network with two degrees, a 3-star is a node with three degrees, and so on. Finally, we combined all of these statistics and more into a data matrix for our models (see appendix for complete details).
+Next, we wrote a function which would find the \textbf{number of k-stars} in each PPIN from one to the maximum size star in the network. For example, a 1-star is a node in the network with one degree, a 2-star is a node in the network with two degrees, a 3-star is a node with three degrees, and so on. 
 
-Above we discussed how random mutations or environmental factors can cause failure of protein interaction networks. Through random and iterative removing of nodes, we simulated systemic damage. We observed changes in the network statistics over progressive simulated damage to the PPIN. The \textbf{critical threshold} is the point where node removal would cause less than 10\% of the total graph to be included in the Giant Component. In the appendix of the paper from SNAP, researchers specify that ``when a network is so fragmented by the removal of nodes that the largest connected part of the network is sufficiently small (only 10\% of the size of the original network), then any sensible dynamical process'' of the PPIN will be unable to function. We ran 10 simulations for each PPIN and took the min, max and mean values for critical threshold as network statistics to feed into our models.
+Above we discussed how random mutations or environmental factors can cause failure of protein interaction networks. Through random and iterative removing of nodes, we simulated systemic damage. We observed changes in the network statistics over progressive simulated damage to the PPIN. The \textbf{critical threshold} is the point where node removal would cause less than 10\% of the total graph to be included in the Giant Component. In the appendix of the paper from SNAP, researchers specify that ``when a network is so fragmented by the removal of nodes that the largest connected part of the network is sufficiently small (only 10\% of the size of the original network), then any sensible dynamical process'' of the PPIN will be unable to function. \textbf{Processing time?} \begin{wrapfigure}{r}[0pt]{0pt}
+\centering
+  \includegraphics[width=.4\linewidth]{PPIN_fig7}
+  \caption{Main core}
+  \label{fig:PPIN_fig7}
+\end{wrapfigure}  We ran 10 simulations for each PPIN and took the mean value for critical threshold as network statistics to feed into our models.
+
+Finally, we explored the main core of each graph. Any complete graph is a core and every graph has a core. The main core is the core with the largest degree. That is, the main core is the largest maximal clique within each network. As a network statistic we considered how many edges each main core has. We expect that the larger the main core of a network, the more resilient it will be to our simulated network failure algorithm. Please see figure 2. Here you can see that the main core of the network shown in the beginning of this paper is a 26-clique with 325 edges. Note that a complete graph of $n$ vertices has $\dfrac{n(n-1)}{2}$ edges. 
 
 \subsection{Models}
 Our research question aims to find network statistics, which measure topological stability of the species’ protein interactome, that are significant predictors of the evolutionary time of a species. That is, we suspect that there is a relationship between some of these network statistics and the response--evolutionary time. The question is, which of the network statistics have the most influence on the response variable? The nature of our data is that there are more variables than data points. Moreover, our network statistics all describe some aspect of topological stability for the network--meaning that they are all highly correlated with each other. For this reason we need models that work well with such data--we need models which perform feature selection, are interpretable, and highly accurate. For this we chose two supervised learning models: Ridge regression and Random Forest regression. 
 
-\begin{wrapfigure}{r}[0pt]{0pt}
+\begin{wrapfigure}{l}[0pt]{0pt}
 \centering
-  \includegraphics[width=.5\linewidth]{PPIN_fig4}
+  \includegraphics[width=.4\linewidth]{PPIN_fig4}
   \caption{Ridge Tuning}
   \label{fig:PPIN_fig4}
 \end{wrapfigure}
 
-The Ridge method regularizes model parameters by shrinking the regression coefficients, using the L2 norm, i.e. adds penalty equivalent to square the magnitude of coefficients. This regularization minimizes the sum of squared coefficients to reduce the impact of correlated predictors. This property allows Ridge regression to handle the multicollinearity of our network statistics while producing interpretable results. The feature selection phase occurs after the shrinkage, where variables with coefficients of relatively small magnitude are interpreted as having minor contribution to the response. Hence, important network statistics for this model where taken to be those which have the coefficients of greatest magnitude. Furthermore, we tuned the penalty term of the Ridge regression using \textit{RidgeCV}. Please see figure 2 for a plot of the Ridge coefficients as a function of the regularization penalty. We found that the optimal regularization penalty was $\text{alpha} = 5$. 
+The Ridge method regularizes model parameters by shrinking the regression coefficients, using the L2 norm, i.e. adds penalty equivalent to square the magnitude of coefficients. This regularization minimizes the sum of squared coefficients to reduce the impact of correlated predictors. This property allows Ridge regression to handle the multicollinearity of our network statistics while producing interpretable results. The feature selection phase occurs after the shrinkage, where variables with coefficients of relatively small magnitude are interpreted as having minor contribution to the response. Hence, important network statistics for this model where taken to be those which have the coefficients of greatest magnitude. Furthermore, we tuned the penalty term of the Ridge regression using \textit{RidgeCV}. Please see figure 3 for a plot of the Ridge coefficients as a function of the regularization penalty. We found that the optimal regularization penalty was $\text{alpha} = 5$. 
 
-Random forests build a collection of de-correlated decision trees, by randomly choosing only $m$ predictors from the full set of predictors when performing a split, the split is only allowed to use one of those $m$ predictors. Finally, the average of the resulting trees is taken. In random forest regression, features are selected that improve the variance reduction. That is, correlation between trees is reduced without increasing the variance too much. For our initial model we used a max depth of four--a parameter that we plan to tune before choosing a final model.
+Random forests build a collection of de-correlated decision trees, by randomly choosing only $m$ predictors from the full set of predictors when performing a split, the split is only allowed to use one of those $m$ predictors. Finally, the average of the resulting trees is taken. In random forest regression, features are selected that improve the variance reduction. That is, correlation between trees is reduced without increasing the variance too much. To tune the hyperparameters for this model we performed an exhaustive search using \textit{GridSearchCV} from Scikit-learn. We tuned the number of estimators, max depth, and max number of features. 
 
-\section{Preliminary Results}
-The network statistics with the most influence on the evolutionary time of each species for the LASSO model were the number of triangles, clique count, LCSG clique count, node count, LCSG node count, LCSG Degree Max, and number of 1-stars (see Figure 2). The sign of coefficients tells you if the network statistic is positively or negatively related to the response, evolutionary time. This project is not focused on finding a linear relationship however we will try to interpret these coefficients.
+\section{Results}
+The network statistics with the most influence on the evolutionary time of each species for the LASSO model were the number of triangles, clique count, LCSG clique count, node count, LCSG node count, LCSG Degree Max, and number of 1-stars (see Figure 4). The sign of coefficients tells you if the network statistic is positively or negatively related to the response, evolutionary time. This project is not focused on finding a linear relationship however we will try to interpret these coefficients.
 \begin{wrapfigure}{r}{0.5\textwidth}
   \vspace{-20pt}
   \begin{center}
